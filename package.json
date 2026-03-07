@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.2.4",
-    "@google/generative-ai": "^0.21.0",
+    "@google/generative-ai": "^0.24.1",
     "@react-google-maps/api": "^2.20.3",
     "axios": "^1.7.9",
     "firebase": "^11.2.0",

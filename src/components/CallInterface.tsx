@@ -26,7 +26,7 @@ export const CallInterface = () => {
   const [callDuration, setCallDuration] = useState(0);
   const durationRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { transcript, isThinking, triageResult, initChat, startCall, sendPatientMessage } = useGemini();
+  const { transcript, isThinking, triageResult, error: geminiError, initChat, startCall, sendPatientMessage } = useGemini();
   const { speak, stop: stopSpeaking, isSpeaking } = useElevenLabs();
   const { vitals, isReady: presageReady } = usePresage(videoRef);
   const { startRecording, stopRecording, downloadRecording } = useRecorder();
@@ -75,8 +75,12 @@ export const CallInterface = () => {
     await startCamera();
     startRecording();
     setCallState('active');
-    const greeting = await startCall(vitals);
-    await speak(greeting, vitals.stressLevel);
+    try {
+      const greeting = await startCall(vitals);
+      if (greeting) await speak(greeting, vitals.stressLevel);
+    } catch (err) {
+      console.error('Call start error:', err);
+    }
   };
 
   const handleEndCall = async () => {
@@ -108,8 +112,12 @@ export const CallInterface = () => {
     recognition.onresult = async (e: SpeechRecognitionEvent) => {
       const text = e.results[0][0].transcript;
       setIsListening(false);
-      const reply = await sendPatientMessage(text, vitals);
-      if (reply) await speak(reply, vitals.stressLevel);
+      try {
+        const reply = await sendPatientMessage(text, vitals);
+        if (reply) await speak(reply, vitals.stressLevel);
+      } catch (err) {
+        console.error('Response error:', err);
+      }
     };
     recognition.onerror = () => setIsListening(false);
     recognition.onend   = () => setIsListening(false);
@@ -238,6 +246,13 @@ export const CallInterface = () => {
           </div>
         )}
 
+        {/* Error banner */}
+        {geminiError && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-2 rounded-xl shadow-md max-w-xs text-center">
+            ⚠️ {geminiError}
+          </div>
+        )}
+
         {/* Thinking indicator */}
         {isThinking && (
           <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-rose-100 shadow-sm">
@@ -253,7 +268,7 @@ export const CallInterface = () => {
 
       {/* Transcript */}
       {callState === 'active' && transcript.length > 0 && (
-        <div ref={transcriptRef} className="h-36 overflow-y-auto px-4 py-3 bg-white border-t border-rose-100 space-y-2">
+        <div ref={transcriptRef} className="h-48 overflow-y-auto px-4 py-3 bg-white border-t border-rose-100 space-y-2">
           {transcript.map((msg, i) => (
             <div key={i} className={`flex gap-2 ${msg.role === 'doctor' ? '' : 'flex-row-reverse'}`}>
               <span className="text-base flex-shrink-0 mt-0.5">{msg.role === 'doctor' ? '🩺' : '🧑'}</span>

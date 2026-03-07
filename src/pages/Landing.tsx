@@ -79,11 +79,25 @@ export const Landing = () => {
         <div className="hidden md:flex flex-1 items-center justify-center relative">
           <div className="absolute w-96 h-96 rounded-full bg-rose-100 blur-3xl opacity-60" />
           <div className="absolute w-64 h-64 rounded-full bg-red-50 blur-2xl opacity-80 translate-x-10 translate-y-6" />
-          <img
-            src="/mascot-wave.png"
-            alt="Dr. Maple"
-            className="fade-in-up delay-2 relative z-10 w-80 h-80 object-contain drop-shadow-2xl"
-          />
+
+          <div className="relative z-10 fade-in-up delay-2">
+            {/* Speech bubble */}
+            <div className="absolute -top-14 left-1/2 -translate-x-1/2 w-max">
+              <div className="relative bg-white border border-rose-200 shadow-md rounded-2xl px-5 py-3">
+                <p className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                  How can I help you today? 🍁
+                </p>
+                {/* Bubble tail pointing down toward mascot mouth */}
+                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r border-b border-rose-200 rotate-45" />
+              </div>
+            </div>
+
+            <img
+              src="/mascot-wave.png"
+              alt="Dr. Maple"
+              className="w-80 h-80 object-contain drop-shadow-2xl"
+            />
+          </div>
         </div>
       </section>
 
@@ -91,15 +105,17 @@ export const Landing = () => {
       <section id="features" className="px-8 md:px-16 lg:px-24 pb-16 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { icon: '🎙', title: 'Voice Conversation',  desc: 'Talk naturally about your symptoms', delay: 'delay-1' },
-            { icon: '📷', title: 'Camera Vitals',        desc: 'Real-time heart rate and stress from your webcam', delay: 'delay-2' },
-            { icon: '🧠', title: 'AI Triage',            desc: 'Clear recommendation — ER, clinic, or home', delay: 'delay-3' },
-            { icon: '🗺',  title: 'Clinic Finder',       desc: 'Nearby ERs and walk-ins with wait times', delay: 'delay-4' },
+            { img: '/mascot-phone.png',  title: 'Voice Conversation', desc: 'Talk naturally about your symptoms', delay: 'delay-1' },
+            { img: '/mascot-heart.png',  title: 'Camera Vitals',       desc: 'Real-time heart rate and stress from your webcam', delay: 'delay-2' },
+            { img: '/mascot-report.png', title: 'AI Triage',           desc: 'Clear recommendation — ER, clinic, or home', delay: 'delay-3' },
+            { img: '/mascot-map.png',    title: 'Clinic Finder',       desc: 'Nearby ERs and walk-ins with wait times', delay: 'delay-4' },
           ].map((f) => (
-            <div key={f.title} className={`fade-in-up ${f.delay} bg-white border border-rose-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-rose-300 transition-all group`}>
-              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-xl mb-3 group-hover:bg-rose-100 transition-colors">
-                {f.icon}
-              </div>
+            <div key={f.title} className={`fade-in-up ${f.delay} bg-white border border-rose-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-rose-300 transition-all group flex flex-col items-center text-center`}>
+              <img
+                src={f.img}
+                alt={f.title}
+                className="w-24 h-24 object-contain mb-3 group-hover:scale-105 transition-transform duration-300"
+              />
               <h3 className="font-semibold text-gray-800 text-sm mb-1">{f.title}</h3>
               <p className="text-xs text-gray-400 leading-relaxed">{f.desc}</p>
             </div>
