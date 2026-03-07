@@ -153,22 +153,30 @@ const generatePairingCode = () => {
   return code;
 };
 
-export const createPairingCode = async (userId: string): Promise<string | null> => {
-  const firestore = getDb();
-  if (!firestore) return null;
+const PAIRING_CODE_TIMEOUT_MS = 12_000;
 
+export type PairingCodeResult = { code: string; saved: boolean };
+
+export const createPairingCode = async (userId: string): Promise<PairingCodeResult> => {
   const code = generatePairingCode();
+  const firestore = getDb();
+  if (!firestore) {
+    return { code, saved: false };
+  }
 
+  const ref = doc(firestore, 'pairingCodes', code);
+  const writePromise = setDoc(ref, {
+    userId,
+    createdAt: Timestamp.now(),
+  });
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('timeout')), PAIRING_CODE_TIMEOUT_MS);
+  });
   try {
-    const ref = doc(firestore, 'pairingCodes', code);
-    await setDoc(ref, {
-      userId,
-      createdAt: Timestamp.now(),
-    });
-    return code;
-  } catch (err) {
-    console.error('Failed to create pairing code:', err);
-    return null;
+    await Promise.race([writePromise, timeoutPromise]);
+    return { code, saved: true };
+  } catch {
+    return { code, saved: false };
   }
 };
 

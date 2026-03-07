@@ -48,21 +48,21 @@ export const Dashboard = () => {
 
   const handleGeneratePairingCode = async () => {
     setPairingError(null);
+    setPairingCode(null);
     if (!user?.sub) {
       setPairingError('Please sign out and sign in again to generate a code.');
       return;
     }
     setIsGeneratingCode(true);
     try {
-      const code = await createPairingCode(user.sub);
-      if (code) {
-        setPairingCode(code);
-      } else {
-        setPairingError('Could not generate code. Check the browser console and Firestore rules for pairingCodes.');
+      const { code, saved } = await createPairingCode(user.sub);
+      setPairingCode(code);
+      if (!saved) {
+        setPairingError('Code not saved to cloud. In Firebase Console → Firestore Database → Rules, add allow read, write for pairingCodes, then Publish.');
       }
     } catch (err) {
       console.error('Pairing code error:', err);
-      setPairingError('Something went wrong. Check the browser console (F12).');
+      setPairingError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setIsGeneratingCode(false);
     }
@@ -193,10 +193,21 @@ export const Dashboard = () => {
                   </button>
                   {pairingCode && (
                     <div className="mt-1 px-3 py-2 rounded-lg bg-gray-800 border border-teal-700/50 w-full">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">Pairing code</p>
-                      <p className="font-mono text-lg text-teal-400 tracking-[0.25em] mt-1">
-                        {pairingCode}
-                      </p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">Pairing code — enter in all caps on phone</p>
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <p className="font-mono text-lg text-teal-400 tracking-[0.25em]">
+                          {pairingCode}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(pairingCode);
+                          }}
+                          className="text-xs text-teal-400 hover:text-teal-300 whitespace-nowrap"
+                        >
+                          Copy
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

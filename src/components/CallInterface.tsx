@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import { DoctorAvatar } from './DoctorAvatar';
-import { PresageMonitor } from './PresageMonitor';
+import { LiveVitals } from './LiveVitals';
 import { useGemini } from '../hooks/useGemini';
 import { useElevenLabs } from '../hooks/useElevenLabs';
 import { usePresage } from '../hooks/usePresage';
+import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useRecorder } from '../hooks/useRecorder';
 import { saveSession } from '../services/firebase';
 import type { TriageResult } from '../constants';
@@ -29,6 +30,7 @@ export const CallInterface = () => {
   const { transcript, isThinking, triageResult, initChat, startCall, sendPatientMessage } = useGemini();
   const { speak, stop: stopSpeaking, isSpeaking } = useElevenLabs();
   const { vitals, isReady: presageReady } = usePresage(videoRef);
+  const { metrics: watchMetrics } = useAppleWatchMetrics();
   const { startRecording, stopRecording, downloadRecording } = useRecorder();
 
   // Auto-scroll transcript
@@ -84,7 +86,7 @@ export const CallInterface = () => {
     startRecording();
     setCallState('active');
 
-    const greeting = await startCall(vitals);
+    const greeting = await startCall(vitals, watchMetrics ?? null);
     await speak(greeting, vitals.stressLevel);
   };
 
@@ -133,14 +135,14 @@ export const CallInterface = () => {
     recognition.onresult = async (event: SpeechRecognitionEvent) => {
       const text = event.results[0][0].transcript;
       setIsListening(false);
-      const doctorReply = await sendPatientMessage(text, vitals);
+      const doctorReply = await sendPatientMessage(text, vitals, watchMetrics ?? null);
       if (doctorReply) await speak(doctorReply, vitals.stressLevel);
     };
 
     recognition.onerror = () => setIsListening(false);
     recognition.onend = () => setIsListening(false);
     recognition.start();
-  }, [isSpeaking, isListening, callState, vitals, sendPatientMessage, speak]);
+  }, [isSpeaking, isListening, callState, vitals, watchMetrics, sendPatientMessage, speak]);
 
   const getUrgencyColor = (urgency: TriageResult['urgency']) => {
     const colors: Record<string, string> = {
@@ -279,7 +281,7 @@ export const CallInterface = () => {
         {/* Vitals overlay — top left */}
         {callState === 'active' && (
           <div className="absolute top-4 left-4 z-20">
-            <PresageMonitor vitals={vitals} isReady={presageReady} />
+            <LiveVitals vitals={vitals} presageReady={presageReady} watchMetrics={watchMetrics} />
           </div>
         )}
 
