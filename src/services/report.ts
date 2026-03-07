@@ -35,7 +35,7 @@ export const generateHealthReport = (data: ReportData): void => {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text('Dr. Nova', margin, 18);
+  doc.text('Dr. Maple', margin, 18);
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -150,7 +150,7 @@ export const generateHealthReport = (data: ReportData): void => {
     doc.setTextColor(...DARK);
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('Dr. Nova\'s Advice', margin, y);
+    doc.text('Dr. Maple\'s Advice', margin, y);
     y += 6;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
@@ -184,7 +184,7 @@ export const generateHealthReport = (data: ReportData): void => {
       startY: 26,
       head: [['Speaker', 'Message']],
       body: data.transcript.map(m => [
-        m.role === 'doctor' ? '🩺 Dr. Nova' : '🧑 Patient',
+        m.role === 'doctor' ? '🩺 Dr. Maple' : '🧑 Patient',
         m.text,
       ]),
       headStyles: { fillColor: TEAL, textColor: [255, 255, 255] },

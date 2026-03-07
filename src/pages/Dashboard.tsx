@@ -98,7 +98,7 @@ export const Dashboard = () => {
       <div className={`flex-1 max-w-3xl mx-auto w-full ${activeTab === 'map' ? '' : 'px-5 py-5'}`}>
         {activeTab === 'history' && (
           <div>
-            {/* Dr. Nova chat bubble */}
+            {/* Dr. Maple chat bubble */}
             <div className="flex items-start gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-teal-700 flex items-center justify-center text-xl flex-shrink-0">
                 🩺

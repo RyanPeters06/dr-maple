@@ -1,4 +1,4 @@
-# Dr. Nova
+# Dr. Maple
 
 > "The call you make before the call"
 
@@ -57,9 +57,9 @@ Open http://localhost:5173
 
 ## Features
 
-- **Voice Conversation** — Talk to Dr. Nova via Web Speech API (no key needed)
+- **Voice Conversation** — Talk to Dr. Maple via Web Speech API (no key needed)
 - **AI Triage** — Gemini 1.5 Flash synthesizes symptoms + vitals into triage recommendations
-- **ElevenLabs Voice** — Dr. Nova speaks back with a warm, human voice
+- **ElevenLabs Voice** — Dr. Maple speaks back with a warm, human voice
 - **Presage Biometrics** — Real-time heart rate, breathing rate, and stress from your webcam
 - **Session Recording** — MediaRecorder captures the full call as .webm
 - **PDF Health Report** — Download a colour-coded triage report after every call
@@ -84,7 +84,7 @@ src/
 
 ## Disclaimer
 
-Dr. Nova is an AI assistant for triage guidance only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. In case of emergency, **call 911 immediately**. For non-emergency health advice, call **811** (Ontario/BC/AB) or your provincial telehealth line.
+Dr. Maple is an AI assistant for triage guidance only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. In case of emergency, **call 911 immediately**. For non-emergency health advice, call **811** (Ontario/BC/AB) or your provincial telehealth line.
 
 ---
 
