@@ -83,7 +83,7 @@ export const DoctorAvatar = ({ isSpeaking, isListening }: DoctorAvatarProps) => 
 
       {/* Name and status */}
       <div className="text-center">
-        <h2 className="text-xl font-bold text-white">Dr. Nova</h2>
+        <h2 className="text-xl font-bold text-white">Dr. Maple</h2>
         <div className="flex items-center justify-center gap-2 mt-1">
           {isSpeaking ? (
             <>

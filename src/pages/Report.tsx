@@ -135,7 +135,7 @@ export const Report = () => {
                     }`}
                   >
                     <p className="text-xs text-gray-500 mb-1">
-                      {msg.role === 'doctor' ? 'Dr. Nova' : 'You'}
+                      {msg.role === 'doctor' ? 'Dr. Maple' : 'You'}
                     </p>
                     {msg.text}
                   </div>

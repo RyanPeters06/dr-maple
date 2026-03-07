@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import { DoctorAvatar } from './DoctorAvatar';
-import { PresageMonitor } from './PresageMonitor';
+import { LiveVitals } from './LiveVitals';
 import { useGemini } from '../hooks/useGemini';
 import { useElevenLabs } from '../hooks/useElevenLabs';
 import { usePresage } from '../hooks/usePresage';
+import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useRecorder } from '../hooks/useRecorder';
 import { saveSession } from '../services/firebase';
 import type { TriageResult } from '../constants';
@@ -29,6 +30,7 @@ export const CallInterface = () => {
   const { transcript, isThinking, triageResult, initChat, startCall, sendPatientMessage } = useGemini();
   const { speak, stop: stopSpeaking, isSpeaking } = useElevenLabs();
   const { vitals, isReady: presageReady } = usePresage(videoRef);
+  const { metrics: watchMetrics } = useAppleWatchMetrics();
   const { startRecording, stopRecording, downloadRecording } = useRecorder();
 
   // Auto-scroll transcript
@@ -84,7 +86,7 @@ export const CallInterface = () => {
     startRecording();
     setCallState('active');
 
-    const greeting = await startCall(vitals);
+    const greeting = await startCall(vitals, watchMetrics ?? null);
     await speak(greeting, vitals.stressLevel);
   };
 
@@ -133,14 +135,14 @@ export const CallInterface = () => {
     recognition.onresult = async (event: SpeechRecognitionEvent) => {
       const text = event.results[0][0].transcript;
       setIsListening(false);
-      const doctorReply = await sendPatientMessage(text, vitals);
+      const doctorReply = await sendPatientMessage(text, vitals, watchMetrics ?? null);
       if (doctorReply) await speak(doctorReply, vitals.stressLevel);
     };
 
     recognition.onerror = () => setIsListening(false);
     recognition.onend = () => setIsListening(false);
     recognition.start();
-  }, [isSpeaking, isListening, callState, vitals, sendPatientMessage, speak]);
+  }, [isSpeaking, isListening, callState, vitals, watchMetrics, sendPatientMessage, speak]);
 
   const getUrgencyColor = (urgency: TriageResult['urgency']) => {
     const colors: Record<string, string> = {
@@ -182,11 +184,11 @@ export const CallInterface = () => {
                 </div>
                 {triageResult.advice && (
                   <div className="bg-gray-800 rounded-xl p-4">
-                    <p className="text-xs text-gray-500 mb-1">Dr. Nova's Advice</p>
+                    <p className="text-xs text-gray-500 mb-1">Dr. Maple's Advice</p>
                     <p className="text-gray-300 text-sm">{triageResult.advice}</p>
                   </div>
                 )}
-                <div className="bg-teal-900/30 border border-teal-700/30 rounded-xl p-4">
+              <div className="bg-teal-900/30 border border-teal-700/30 rounded-xl p-4">
                   <p className="text-xs text-teal-400 mb-1">🍁 Canadian Resource</p>
                   <p className="text-teal-300 text-sm font-medium">{triageResult.canadian_resource}</p>
                 </div>
@@ -230,7 +232,7 @@ export const CallInterface = () => {
       <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center gap-2">
           <span className="text-lg">🩺</span>
-          <span className="font-semibold text-white text-sm">Dr. Nova</span>
+          <span className="font-semibold text-white text-sm">Dr. Maple</span>
           {callState === 'active' && (
             <span className="flex items-center gap-1.5 ml-2">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -279,7 +281,7 @@ export const CallInterface = () => {
         {/* Vitals overlay — top left */}
         {callState === 'active' && (
           <div className="absolute top-4 left-4 z-20">
-            <PresageMonitor vitals={vitals} isReady={presageReady} />
+            <LiveVitals vitals={vitals} presageReady={presageReady} watchMetrics={watchMetrics} />
           </div>
         )}
 
@@ -295,7 +297,7 @@ export const CallInterface = () => {
                 />
               ))}
             </div>
-            <span className="text-xs text-gray-400">Dr. Nova is thinking...</span>
+            <span className="text-xs text-gray-400">Dr. Maple is thinking...</span>
           </div>
         )}
       </div>
@@ -334,7 +336,7 @@ export const CallInterface = () => {
               className="btn-primary flex items-center gap-3 text-base px-10 py-4"
             >
               <span className="text-xl">📞</span>
-              Start Call with Dr. Nova
+              Start Call with Dr. Maple
             </button>
             <p className="text-xs text-gray-600">
               Camera + microphone access required · Your session is private
@@ -343,9 +345,9 @@ export const CallInterface = () => {
         )}
 
         {callState === 'starting' && (
-          <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-3">
             <div className="w-5 h-5 rounded-full border-2 border-teal-400 border-t-transparent animate-spin" />
-            <span className="text-gray-400">Connecting to Dr. Nova...</span>
+            <span className="text-gray-400">Connecting to Dr. Maple...</span>
           </div>
         )}
 

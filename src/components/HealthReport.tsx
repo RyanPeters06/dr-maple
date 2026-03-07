@@ -103,7 +103,7 @@ export const HealthReport = ({ triageResult, transcript, duration, date }: Healt
         {/* Advice */}
         {triageResult.advice && (
           <div className="bg-teal-900/20 border border-teal-700/30 rounded-xl p-4">
-            <p className="text-xs text-teal-500 mb-1">Dr. Nova's Advice</p>
+            <p className="text-xs text-teal-500 mb-1">Dr. Maple's Advice</p>
             <p className="text-teal-200 text-sm">{triageResult.advice}</p>
           </div>
         )}

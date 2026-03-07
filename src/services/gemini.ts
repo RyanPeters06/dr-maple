@@ -3,9 +3,27 @@ import type { TriageResult } from '../constants';
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
+export type VitalsContext = {
+  heartRate?: number | null;
+  breathingRate?: number | null;
+  stressLevel?: number | null;
+};
+
+export type AppleWatchContext = {
+  avgHeartRate?: number | null;
+  stepsToday?: number;
+  activeEnergyKcal?: number;
+  exerciseMinutes?: number;
+  standHours?: number;
+  sleepDurationHours?: number | null;
+  sleepQuality?: string | null;
+  avgNoiseDbA?: number | null;
+  updatedAt?: string | null;
+};
+
 const SYSTEM_PROMPT = `
-You are Dr. Nova, a friendly, professional, and approachable AI triage assistant. 
-You are the main persona and mascot of Dr. Nova — a virtual health assistant for Canadians.
+You are Dr. Maple, a friendly, professional, and approachable AI triage assistant.
+You are the main persona and mascot of Dr. Maple — a virtual health assistant for Canadians.
 
 ## Your Personality
 - Your tone is calm, warm, and reassuring, yet confident and clear
@@ -27,6 +45,7 @@ You are the main persona and mascot of Dr. Nova — a virtual health assistant f
 - If ANY red flags are detected, IMMEDIATELY and calmly recommend calling 911
 - Factor in the biometric data provided (heart rate, breathing rate, stress level) 
   and gently mention if something looks elevated
+- When Apple Watch data is provided (heart rate, sleep, steps, exercise), use it as the primary source for vitals and activity level
 - After 4–6 exchanges, wrap up with a clear, kind triage recommendation
 
 ## Your Sign-Off Format
@@ -79,16 +98,34 @@ export const createDoctorChat = (): ChatSession => {
 export const sendMessage = async (
   chat: ChatSession,
   userMessage: string,
-  vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null }
+  vitals?: VitalsContext,
+  appleWatch?: AppleWatchContext | null
 ): Promise<string> => {
   let message = userMessage;
+  const parts: string[] = [];
+
+  if (appleWatch && (appleWatch.avgHeartRate != null || appleWatch.stepsToday != null || appleWatch.sleepDurationHours != null)) {
+    const watchParts: string[] = [];
+    if (appleWatch.avgHeartRate != null) watchParts.push(`Heart rate: ${Math.round(appleWatch.avgHeartRate)} bpm`);
+    if (appleWatch.stepsToday != null) watchParts.push(`Steps today: ${appleWatch.stepsToday}`);
+    if (appleWatch.exerciseMinutes != null) watchParts.push(`Exercise: ${appleWatch.exerciseMinutes} min`);
+    if (appleWatch.standHours != null) watchParts.push(`Stand hours: ${appleWatch.standHours}`);
+    if (appleWatch.sleepDurationHours != null) watchParts.push(`Sleep last night: ${appleWatch.sleepDurationHours.toFixed(1)} h (${appleWatch.sleepQuality ?? '—'})`);
+    if (appleWatch.activeEnergyKcal != null) watchParts.push(`Active energy: ${Math.round(appleWatch.activeEnergyKcal)} kcal`);
+    if (appleWatch.avgNoiseDbA != null) watchParts.push(`Noise exposure: ${appleWatch.avgNoiseDbA.toFixed(0)} dB`);
+    parts.push(`Apple Watch data — ${watchParts.join(', ')}`);
+  }
 
   if (vitals && (vitals.heartRate || vitals.breathingRate || vitals.stressLevel)) {
     const vitalParts: string[] = [];
     if (vitals.heartRate) vitalParts.push(`Heart rate: ${vitals.heartRate} bpm`);
     if (vitals.breathingRate) vitalParts.push(`Breathing rate: ${vitals.breathingRate}/min`);
     if (vitals.stressLevel) vitalParts.push(`Stress level: ${vitals.stressLevel}/100`);
-    message += `\n\n[Biometric data from camera — ${vitalParts.join(', ')}]`;
+    parts.push(`Camera vitals — ${vitalParts.join(', ')}`);
+  }
+
+  if (parts.length > 0) {
+    message += `\n\n[Live data: ${parts.join(' | ')}]`;
   }
 
   const result = await chat.sendMessage(message);

@@ -12,7 +12,7 @@ export const AuthGate = ({ children }: AuthGateProps) => {
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full border-4 border-teal-600 border-t-transparent animate-spin" />
-          <p className="text-gray-400 text-sm">Loading Dr. Nova...</p>
+          <p className="text-gray-400 text-sm">Loading Dr. Maple...</p>
         </div>
       </div>
     );
@@ -26,7 +26,7 @@ export const AuthGate = ({ children }: AuthGateProps) => {
             🩺
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Dr. Nova</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Dr. Maple</h1>
             <p className="text-gray-400">Sign in to access your AI health assistant and view your health history.</p>
           </div>
           <button

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { createDoctorChat, sendMessage, parseTriageResult, extractCleanText, type ChatSession } from '../services/gemini';
+import { createDoctorChat, sendMessage, parseTriageResult, extractCleanText, type ChatSession, type AppleWatchContext } from '../services/gemini';
 import type { TriageResult } from '../constants';
 
 export interface TranscriptMessage {
@@ -20,14 +20,18 @@ export const useGemini = () => {
     setTriageResult(null);
   }, []);
 
-  const startCall = useCallback(async (vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null }): Promise<string> => {
+  const startCall = useCallback(async (
+    vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null },
+    appleWatch?: AppleWatchContext | null
+  ): Promise<string> => {
     if (!chatRef.current) initChat();
     setIsThinking(true);
     try {
       const rawResponse = await sendMessage(
         chatRef.current!,
         'The patient has just joined the video call. Please warmly greet them and ask what brings them in today.',
-        vitals
+        vitals,
+        appleWatch
       );
       const cleanText = extractCleanText(rawResponse);
       const triage = parseTriageResult(rawResponse);
@@ -42,14 +46,15 @@ export const useGemini = () => {
 
   const sendPatientMessage = useCallback(async (
     patientText: string,
-    vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null }
+    vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null },
+    appleWatch?: AppleWatchContext | null
   ): Promise<string> => {
     if (!chatRef.current) return '';
     setIsThinking(true);
     setTranscript(prev => [...prev, { role: 'patient', text: patientText, timestamp: new Date() }]);
 
     try {
-      const rawResponse = await sendMessage(chatRef.current, patientText, vitals);
+      const rawResponse = await sendMessage(chatRef.current, patientText, vitals, appleWatch);
       const cleanText = extractCleanText(rawResponse);
       const triage = parseTriageResult(rawResponse);
       if (triage) setTriageResult(triage);
