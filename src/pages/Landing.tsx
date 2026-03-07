@@ -1,109 +1,163 @@
+import { useRef } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import { CANADIAN_RESOURCES } from '../constants';
+import { useScrollReveal } from '../hooks/useScrollReveal';
 
 export const Landing = () => {
-  const { isAuthenticated, loginWithRedirect } = useAuth0();
+  const { loginWithRedirect } = useAuth0();
   const navigate = useNavigate();
-
-  const handleCTA = () => {
-    if (isAuthenticated) {
-      navigate('/call');
-    } else {
-      loginWithRedirect();
-    }
-  };
+  const pageRef = useRef<HTMLDivElement>(null);
+  useScrollReveal(pageRef);
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🩺</span>
-          <span className="text-xl font-bold text-white">Dr. Nova</span>
-          <span className="text-xs bg-teal-600/20 text-teal-400 border border-teal-600/30 px-2 py-0.5 rounded-full ml-1">
-            Hack Canada 2026
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          {isAuthenticated ? (
-            <>
-              <button onClick={() => navigate('/dashboard')} className="text-gray-400 hover:text-white text-sm transition-colors">
-                My History
-              </button>
-              <button onClick={() => navigate('/call')} className="btn-primary py-2 px-5 text-sm">
-                Start Call
-              </button>
-            </>
-          ) : (
-            <button onClick={() => loginWithRedirect()} className="btn-primary py-2 px-5 text-sm">
-              Sign In
-            </button>
-          )}
-        </div>
-      </nav>
+    <div ref={pageRef} className="min-h-screen bg-white flex flex-col overflow-hidden">
 
-      {/* Hero */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center max-w-4xl mx-auto">
-        <div className="mb-6 relative">
-          <div className="w-28 h-28 rounded-full bg-teal-600/20 border-2 border-teal-500/50 flex items-center justify-center text-6xl mx-auto shadow-2xl shadow-teal-900/50">
-            🩺
-          </div>
-          <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-sm animate-pulse">
-            🍁
-          </div>
-        </div>
+      {/* ── Nav ─────────────────────────────────────────────────────────────── */}
+      <nav className="flex items-center justify-between px-8 py-4 border-b border-rose-100">
+        <img src="/dr-maple-logo.png" alt="Dr. Maple" className="h-28 object-contain" />
 
-        <h1 className="text-5xl md:text-6xl font-extrabold text-white mb-4 leading-tight">
-          Dr. Nova
-        </h1>
-        <p className="text-xl text-teal-400 font-medium mb-4">
-          "The call you make before the call"
-        </p>
-        <p className="text-gray-400 text-lg max-w-2xl mb-10">
-          A voice + vision AI triage assistant for Canadians. Talk to Dr. Nova about your symptoms, 
-          get real-time vitals from your camera, and receive a clear recommendation — before you 
-          decide whether to call 911 or rest at home.
-        </p>
-
-        <button onClick={handleCTA} className="btn-primary text-lg px-10 py-4 mb-4">
-          {isAuthenticated ? '📞 Start a Call with Dr. Nova' : '🚀 Get Started — It\'s Free'}
-        </button>
-        <p className="text-xs text-gray-600">
-          Not a substitute for professional medical advice · In emergencies, call {CANADIAN_RESOURCES.emergency}
-        </p>
-
-        {/* Feature grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-16 w-full max-w-3xl">
-          {[
-            { icon: '🎙️', title: 'Voice Conversation', desc: 'Talk naturally about your symptoms in plain English' },
-            { icon: '📷', title: 'Camera Vitals', desc: 'Real-time heart rate, breathing & stress from your webcam' },
-            { icon: '🧠', title: 'AI Triage', desc: 'Gemini AI synthesizes everything into a clear recommendation' },
-            { icon: '🗺️', title: 'Clinic Finder', desc: 'Nearby clinics & ERs with estimated wait times' },
-            { icon: '📄', title: 'Health Report', desc: 'Download a PDF summary of every session' },
-            { icon: '🍁', title: 'Canadian-First', desc: '811, Telehealth, province-specific resources built in' },
-          ].map((f) => (
-            <div key={f.title} className="card hover:border-teal-700 transition-colors text-left">
-              <div className="text-2xl mb-2">{f.icon}</div>
-              <h3 className="font-semibold text-white text-sm mb-1">{f.title}</h3>
-              <p className="text-xs text-gray-500">{f.desc}</p>
-            </div>
+        <div className="hidden md:flex items-center gap-8">
+          {['How It Works', 'Features', 'For Canadians'].map(label => (
+            <a
+              key={label}
+              href={`#${label.toLowerCase().replace(/\s+/g, '-')}`}
+              className="text-sm text-gray-500 hover:text-rose-600 transition-colors font-medium"
+            >
+              {label}
+            </a>
           ))}
         </div>
 
-        {/* Disclaimer */}
-        <div className="mt-12 max-w-2xl text-center">
-          <div className="bg-amber-900/20 border border-amber-700/30 rounded-xl px-6 py-4 text-xs text-amber-400/80">
-            ⚠️ Dr. Nova is an AI assistant for triage guidance only. It is NOT a substitute for professional 
-            medical advice, diagnosis, or treatment. In case of emergency, call 911 immediately. 
-            For non-emergency advice, call 811 (Ontario/BC/AB) or your provincial telehealth line.
+        <div className="flex items-center gap-3">
+          <button onClick={() => loginWithRedirect()} className="text-sm text-gray-500 hover:text-rose-600 font-medium transition-colors">
+            Sign In
+          </button>
+          <button onClick={() => loginWithRedirect()} className="btn-primary py-2 px-5 text-sm">
+            Try for Free
+          </button>
+        </div>
+      </nav>
+
+      {/* ── Hero ────────────────────────────────────────────────────────────── */}
+      <section className="flex items-center px-8 md:px-16 lg:px-24 py-14 max-w-7xl mx-auto w-full gap-8">
+        {/* Left */}
+        <div className="flex-1 flex flex-col gap-6 max-w-xl">
+          <h1 className="fade-in-up delay-1 text-5xl md:text-6xl font-extrabold text-gray-900 leading-tight">
+            Dr. Maple —{' '}
+            <span className="text-rose-600">Your Personal</span>{' '}
+            AI Health Assistant
+          </h1>
+
+          <p className="fade-in-up delay-2 text-gray-500 text-lg leading-relaxed">
+            A voice and vision AI triage assistant designed for Canadians. Talk about your symptoms,
+            get real-time vitals from your camera, and receive a clear recommendation — before you
+            decide to call 911 or rest at home.
+          </p>
+
+          <div className="fade-in-up delay-3 flex items-center gap-4 flex-wrap">
+            <button onClick={() => loginWithRedirect()} className="btn-primary text-base px-8 py-3.5">
+              Get Started Free
+            </button>
+            <button
+              onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+              className="flex items-center gap-2 text-gray-500 hover:text-rose-600 text-sm font-medium transition-colors"
+            >
+              <span className="w-8 h-8 rounded-full border-2 border-gray-200 hover:border-rose-300 flex items-center justify-center text-xs transition-colors">
+                ▶
+              </span>
+              See how it works
+            </button>
+          </div>
+
+          <p className="fade-in-up delay-4 text-xs text-gray-400">
+            Not a substitute for professional medical advice · In emergencies, call {CANADIAN_RESOURCES.emergency}
+          </p>
+        </div>
+
+        {/* Right — mascot */}
+        <div className="hidden md:flex flex-1 items-center justify-center relative">
+          <div className="absolute w-96 h-96 rounded-full bg-rose-100 blur-3xl opacity-60" />
+          <div className="absolute w-64 h-64 rounded-full bg-red-50 blur-2xl opacity-80 translate-x-10 translate-y-6" />
+          <img
+            src="/mascot-wave.png"
+            alt="Dr. Maple"
+            className="fade-in-up delay-2 relative z-10 w-80 h-80 object-contain drop-shadow-2xl"
+          />
+        </div>
+      </section>
+
+      {/* ── Feature cards ───────────────────────────────────────────────────── */}
+      <section id="features" className="px-8 md:px-16 lg:px-24 pb-16 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { icon: '🎙', title: 'Voice Conversation',  desc: 'Talk naturally about your symptoms', delay: 'delay-1' },
+            { icon: '📷', title: 'Camera Vitals',        desc: 'Real-time heart rate and stress from your webcam', delay: 'delay-2' },
+            { icon: '🧠', title: 'AI Triage',            desc: 'Clear recommendation — ER, clinic, or home', delay: 'delay-3' },
+            { icon: '🗺',  title: 'Clinic Finder',       desc: 'Nearby ERs and walk-ins with wait times', delay: 'delay-4' },
+          ].map((f) => (
+            <div key={f.title} className={`fade-in-up ${f.delay} bg-white border border-rose-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-rose-300 transition-all group`}>
+              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-xl mb-3 group-hover:bg-rose-100 transition-colors">
+                {f.icon}
+              </div>
+              <h3 className="font-semibold text-gray-800 text-sm mb-1">{f.title}</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── How it works ────────────────────────────────────────────────────── */}
+      <section id="how-it-works" className="bg-rose-50 px-8 md:px-16 lg:px-24 py-16">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-10">How It Works</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { step: '01', title: 'Describe Your Symptoms', desc: 'Talk to Dr. Maple naturally by voice. No forms, no typing — just a conversation.', delay: 'delay-1' },
+              { step: '02', title: 'Vitals Captured Live',   desc: 'Your webcam passively monitors heart rate, breathing rate, and stress level in real time.', delay: 'delay-3' },
+              { step: '03', title: 'Get Your Triage Result', desc: 'Dr. Maple gives you a clear action — plus a downloadable PDF report and nearby clinic options.', delay: 'delay-5' },
+            ].map((s) => (
+              <div key={s.step} className={`fade-in-up ${s.delay} bg-white rounded-2xl p-6 border border-rose-100 shadow-sm flex flex-col gap-3`}>
+                <span className="text-xs font-bold text-rose-400 tracking-widest">{s.step}</span>
+                <h3 className="font-bold text-gray-800 text-lg">{s.title}</h3>
+                <p className="text-sm text-gray-400 leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </main>
+      </section>
 
-      <footer className="text-center text-xs text-gray-700 py-4">
-        Built with ❤️ for Hack Canada 2026 · Dr. Nova is not a licensed medical service
+      {/* ── Canadian resources ──────────────────────────────────────────────── */}
+      <section id="for-canadians" className="px-8 md:px-16 lg:px-24 py-14 max-w-7xl mx-auto w-full">
+        <div className="flex flex-col md:flex-row items-center gap-8 bg-white border border-rose-100 rounded-3xl p-8 shadow-sm">
+          <img src="/mascot-wave.png" alt="Dr. Maple" className="w-28 h-28 object-contain drop-shadow" />
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Built for Canadians</h2>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Dr. Maple understands the Canadian healthcare system — long ER waits, walk-in availability,
+              and the value of telehealth. Every session includes province-specific resources like{' '}
+              <span className="text-rose-600 font-semibold">811 (Health Line)</span>,
+              Telehealth Ontario, Health Link Alberta, and more.
+            </p>
+          </div>
+          <button onClick={() => loginWithRedirect()} className="btn-primary whitespace-nowrap px-8 py-3.5">
+            Get Started Free
+          </button>
+        </div>
+      </section>
+
+      {/* ── Footer ──────────────────────────────────────────────────────────── */}
+      <footer className="border-t border-rose-100 bg-white px-8 py-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+          <img src="/dr-maple-logo.png" alt="Dr. Maple" className="h-20 object-contain" />
+          <p className="text-xs text-gray-400 text-center max-w-md">
+            Dr. Maple is for triage guidance only — not a substitute for professional medical advice.
+            In emergencies, call 911. For non-emergency advice, call 811.
+          </p>
+          <p className="text-xs text-gray-300">Built for Hack Canada 2026</p>
+        </div>
       </footer>
+
     </div>
   );
 };

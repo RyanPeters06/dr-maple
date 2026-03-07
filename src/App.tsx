@@ -13,11 +13,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const HomeRedirect = () => {
+  const { isAuthenticated, isLoading } = useAuth0();
+  if (isLoading) return null;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  return <Landing />;
+};
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<HomeRedirect />} />
         <Route
           path="/call"
           element={

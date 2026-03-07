@@ -26,7 +26,7 @@ export const useGemini = () => {
     try {
       const rawResponse = await sendMessage(
         chatRef.current!,
-        'The patient has just joined the video call. Please warmly greet them and ask what brings them in today.',
+        'The patient has just joined the video call. Please warmly greet them as Dr. Maple and ask what brings them in today.',
         vitals
       );
       const cleanText = extractCleanText(rawResponse);

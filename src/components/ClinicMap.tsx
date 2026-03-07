@@ -7,12 +7,8 @@ import { DEFAULT_LOCATION } from '../constants';
 const LIBRARIES: ('places')[] = ['places'];
 
 const MAP_STYLES = [
-  { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0f0f1a' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d2d44' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1117' }] },
   { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ];
 
 export const ClinicMap = () => {
@@ -83,9 +79,9 @@ export const ClinicMap = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Map header */}
-      <div className="px-4 py-3 bg-gray-900 border-b border-gray-800 flex-shrink-0">
-        <h2 className="font-bold text-white">Nearby Clinics & ERs</h2>
-        <p className="text-xs text-gray-500 mt-0.5">
+      <div className="px-4 py-3 bg-white border-b border-rose-100 flex-shrink-0">
+        <h2 className="font-bold text-gray-800">Nearby Clinics & ERs</h2>
+        <p className="text-xs text-gray-400 mt-0.5">
           {isLocating ? 'Locating you...' : `${clinics.length} locations found near you`}
         </p>
       </div>
@@ -166,30 +162,28 @@ export const ClinicMap = () => {
       </div>
 
       {/* Clinic list */}
-      <div className="h-52 overflow-y-auto bg-gray-900 border-t border-gray-800 flex-shrink-0">
+      <div className="h-52 overflow-y-auto bg-white border-t border-rose-100 flex-shrink-0">
         {clinics.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-400 text-sm">
               {isLocating ? 'Finding nearby clinics...' : 'No clinics found nearby'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-800">
+          <div className="divide-y divide-rose-50">
             {clinics.map((clinic) => (
               <button
                 key={clinic.id}
                 onClick={() => handleClinicClick(clinic)}
-                className={`w-full text-left px-4 py-3 hover:bg-gray-800/60 transition-colors flex items-center justify-between gap-3 ${
-                  selectedClinic?.id === clinic.id ? 'bg-gray-800' : ''
+                className={`w-full text-left px-4 py-3 hover:bg-rose-50 transition-colors flex items-center justify-between gap-3 ${
+                  selectedClinic?.id === clinic.id ? 'bg-rose-50' : ''
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-lg flex-shrink-0">
-                    {clinic.type === 'hospital' ? '🏥' : '🏥'}
-                  </span>
+                  <span className="text-lg flex-shrink-0">🏥</span>
                   <div className="min-w-0">
-                    <p className="font-medium text-sm text-white truncate">{clinic.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{clinic.address}</p>
+                    <p className="font-medium text-sm text-gray-800 truncate">{clinic.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{clinic.address}</p>
                   </div>
                 </div>
                 <div className="flex-shrink-0">
