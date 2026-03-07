@@ -87,7 +87,6 @@ export const Landing = () => {
                 <p className="text-sm font-medium text-gray-700 whitespace-nowrap">
                   How can I help you today? 🍁
                 </p>
-                {/* Bubble tail pointing down toward mascot mouth */}
                 <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r border-b border-rose-200 rotate-45" />
               </div>
             </div>

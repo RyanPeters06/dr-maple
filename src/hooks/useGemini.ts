@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { createDoctorChat, sendMessage, parseTriageResult, extractCleanText, MODEL_PRIORITY, type ChatSession } from '../services/gemini';
+import { createDoctorChat, sendMessage, parseTriageResult, extractCleanText, MODEL_PRIORITY, type ChatSession, type AppleWatchContext } from '../services/gemini';
 import type { TriageResult } from '../constants';
 
 export interface TranscriptMessage {
@@ -23,15 +23,13 @@ export const useGemini = () => {
     setError(null);
   }, []);
 
-  const startCall = useCallback(async (vitals?: {
-    heartRate?: number | null;
-    breathingRate?: number | null;
-    stressLevel?: number | null;
-  }): Promise<string> => {
+  const startCall = useCallback(async (
+    vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null },
+    appleWatch?: AppleWatchContext | null
+  ): Promise<string> => {
     setIsThinking(true);
     setError(null);
 
-    // Try each model in priority order
     for (let i = modelIndexRef.current; i < MODEL_PRIORITY.length; i++) {
       try {
         initChat(MODEL_PRIORITY[i]);
@@ -39,7 +37,8 @@ export const useGemini = () => {
         const rawResponse = await sendMessage(
           chatRef.current!,
           'The patient has just joined the video call. Please warmly greet them as Dr. Maple and ask what brings them in today.',
-          vitals
+          vitals,
+          appleWatch
         );
         const cleanText = extractCleanText(rawResponse);
         const triage = parseTriageResult(rawResponse);
@@ -63,7 +62,8 @@ export const useGemini = () => {
 
   const sendPatientMessage = useCallback(async (
     patientText: string,
-    vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null }
+    vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null },
+    appleWatch?: AppleWatchContext | null
   ): Promise<string> => {
     if (!chatRef.current) {
       setError('Session expired — please end and restart the call.');
@@ -74,7 +74,7 @@ export const useGemini = () => {
     setTranscript(prev => [...prev, { role: 'patient', text: patientText, timestamp: new Date() }]);
 
     try {
-      const rawResponse = await sendMessage(chatRef.current, patientText, vitals);
+      const rawResponse = await sendMessage(chatRef.current, patientText, vitals, appleWatch);
       const cleanText = extractCleanText(rawResponse);
       const triage = parseTriageResult(rawResponse);
       if (triage) setTriageResult(triage);

@@ -1,0 +1,16 @@
+rules_version = '2';
+// Copy these rules into Firebase Console → Firestore Database → Rules → paste → Publish
+// This allows the web app to create pairing codes and the iOS app to write watch metrics.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /sessions/{sessionId} {
+      allow read, write: if true;
+    }
+    match /pairingCodes/{code} {
+      allow read, write: if true;
+    }
+    match /users/{userId}/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

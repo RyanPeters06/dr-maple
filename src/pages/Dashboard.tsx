@@ -6,6 +6,8 @@ import type { TriageLevel } from '../constants';
 import { ClinicMap } from '../components/ClinicMap';
 import { useState, useRef } from 'react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
+import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
+import { createPairingCode } from '../services/firebase';
 
 type DashTab = 'history' | 'map';
 
@@ -16,6 +18,10 @@ export const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<DashTab>('history');
   const pageRef = useRef<HTMLDivElement>(null);
   useScrollReveal(pageRef);
+  const { metrics: watchMetrics, isLoading: watchLoading } = useAppleWatchMetrics();
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [pairingError, setPairingError] = useState<string | null>(null);
 
   const formatDate = (iso: string) => {
     try {
@@ -34,10 +40,32 @@ export const Dashboard = () => {
   const getUrgencyStyle = (urgency: string) =>
     TRIAGE_LEVELS[urgency as TriageLevel] ?? TRIAGE_LEVELS['Non-urgent'];
 
+  const handleGeneratePairingCode = async () => {
+    setPairingError(null);
+    setPairingCode(null);
+    if (!user?.sub) {
+      setPairingError('Please sign out and sign in again to generate a code.');
+      return;
+    }
+    setIsGeneratingCode(true);
+    try {
+      const { code, saved } = await createPairingCode(user.sub);
+      setPairingCode(code);
+      if (!saved) {
+        setPairingError('Code not saved to cloud. In Firebase Console → Firestore Database → Rules, add allow read, write for pairingCodes, then Publish.');
+      }
+    } catch (err) {
+      console.error('Pairing code error:', err);
+      setPairingError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  };
+
   return (
     <div ref={pageRef} className="min-h-screen bg-white flex flex-col">
 
-      {/* ── Nav (matches landing) ───────────────────────────────────────────── */}
+      {/* ── Nav ─────────────────────────────────────────────────────────────── */}
       <nav className="flex items-center justify-between px-8 py-4 border-b border-rose-100 bg-white sticky top-0 z-30">
         <img src="/dr-maple-logo.png" alt="Dr. Maple" className="h-28 object-contain cursor-pointer" onClick={() => navigate('/')} />
 
@@ -53,10 +81,7 @@ export const Dashboard = () => {
               {user?.name ?? user?.email}
             </span>
           </div>
-          <button
-            onClick={() => navigate('/call')}
-            className="btn-primary py-2 px-5 text-sm"
-          >
+          <button onClick={() => navigate('/call')} className="btn-primary py-2 px-5 text-sm">
             New Call
           </button>
           <button
@@ -84,10 +109,7 @@ export const Dashboard = () => {
             <button onClick={() => navigate('/call')} className="btn-primary px-8 py-3">
               Start a Call with Dr. Maple
             </button>
-            <button
-              onClick={() => setActiveTab('map')}
-              className="btn-ghost px-6 py-3 text-rose-600"
-            >
+            <button onClick={() => setActiveTab('map')} className="btn-ghost px-6 py-3 text-rose-600">
               Find a Clinic
             </button>
           </div>
@@ -129,6 +151,74 @@ export const Dashboard = () => {
 
         {activeTab === 'history' && (
           <>
+            {/* Apple Watch companion card */}
+            <div className="card mb-6 border border-rose-100">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center text-lg flex-shrink-0">
+                    ⌚️
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Dr. Maple Watch Companion</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Connect your Apple Watch to share heart rate, sleep, and activity data with Dr. Maple.
+                    </p>
+                    {watchMetrics && (
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-gray-600">
+                        {typeof watchMetrics.avgHeartRate === 'number' && (
+                          <p>❤️ Avg HR (24h): <span className="font-semibold text-gray-800">{Math.round(watchMetrics.avgHeartRate)} bpm</span></p>
+                        )}
+                        {typeof watchMetrics.stepsToday === 'number' && (
+                          <p>🚶 Steps today: <span className="font-semibold text-gray-800">{watchMetrics.stepsToday}</span></p>
+                        )}
+                        {typeof watchMetrics.exerciseMinutes === 'number' && (
+                          <p>🏃 Exercise: <span className="font-semibold text-gray-800">{watchMetrics.exerciseMinutes} min</span></p>
+                        )}
+                        {typeof watchMetrics.sleepDurationHours === 'number' && (
+                          <p>😴 Sleep last night: <span className="font-semibold text-gray-800">{watchMetrics.sleepDurationHours.toFixed(1)} h</span></p>
+                        )}
+                      </div>
+                    )}
+                    {!watchMetrics && !watchLoading && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        After pairing, open the Dr. Maple Watch app on your iPhone and tap &quot;Sync&quot; to send data here.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                  {pairingError && (
+                    <div className="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-left max-w-xs">
+                      <p className="text-xs text-red-500">{pairingError}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleGeneratePairingCode}
+                    className="btn-primary px-3 py-1.5 text-xs disabled:opacity-60 disabled:cursor-wait"
+                    disabled={isGeneratingCode}
+                  >
+                    {isGeneratingCode ? 'Generating…' : 'Get Pairing Code'}
+                  </button>
+                  {pairingCode && (
+                    <div className="mt-1 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">Pairing code — enter in all caps on phone</p>
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <p className="font-mono text-lg text-rose-600 tracking-[0.25em]">{pairingCode}</p>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(pairingCode)}
+                          className="text-xs text-rose-400 hover:text-rose-600 whitespace-nowrap"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Session history */}
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />

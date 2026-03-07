@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import { DoctorAvatar } from './DoctorAvatar';
-import { PresageMonitor } from './PresageMonitor';
+import { LiveVitals } from './LiveVitals';
 import { useGemini } from '../hooks/useGemini';
 import { useElevenLabs } from '../hooks/useElevenLabs';
 import { usePresage } from '../hooks/usePresage';
+import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useRecorder } from '../hooks/useRecorder';
 import { saveSession } from '../services/firebase';
 import type { TriageResult } from '../constants';
@@ -29,6 +30,7 @@ export const CallInterface = () => {
   const { transcript, isThinking, triageResult, error: geminiError, initChat, startCall, sendPatientMessage } = useGemini();
   const { speak, stop: stopSpeaking, isSpeaking } = useElevenLabs();
   const { vitals, isReady: presageReady } = usePresage(videoRef);
+  const { metrics: watchMetrics } = useAppleWatchMetrics();
   const { startRecording, stopRecording, downloadRecording } = useRecorder();
 
   useEffect(() => {
@@ -76,7 +78,7 @@ export const CallInterface = () => {
     startRecording();
     setCallState('active');
     try {
-      const greeting = await startCall(vitals);
+      const greeting = await startCall(vitals, watchMetrics ?? null);
       if (greeting) await speak(greeting, vitals.stressLevel);
     } catch (err) {
       console.error('Call start error:', err);
@@ -113,7 +115,7 @@ export const CallInterface = () => {
       const text = e.results[0][0].transcript;
       setIsListening(false);
       try {
-        const reply = await sendPatientMessage(text, vitals);
+        const reply = await sendPatientMessage(text, vitals, watchMetrics ?? null);
         if (reply) await speak(reply, vitals.stressLevel);
       } catch (err) {
         console.error('Response error:', err);
@@ -122,7 +124,7 @@ export const CallInterface = () => {
     recognition.onerror = () => setIsListening(false);
     recognition.onend   = () => setIsListening(false);
     recognition.start();
-  }, [isSpeaking, isListening, callState, vitals, sendPatientMessage, speak]);
+  }, [isSpeaking, isListening, callState, vitals, watchMetrics, sendPatientMessage, speak]);
 
   const getUrgencyStyle = (urgency: TriageResult['urgency']) => ({
     Emergency:    'bg-red-600 text-white',
@@ -242,7 +244,7 @@ export const CallInterface = () => {
         {/* Vitals overlay */}
         {callState === 'active' && (
           <div className="absolute top-4 left-4 z-20">
-            <PresageMonitor vitals={vitals} isReady={presageReady} />
+            <LiveVitals vitals={vitals} presageReady={presageReady} watchMetrics={watchMetrics} />
           </div>
         )}
 
