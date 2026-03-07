@@ -52,6 +52,7 @@ Open http://localhost:5173
 1. Create project → Add Web App → Copy config
 2. Go to Firestore Database → Create database (start in test mode)
 3. Add a composite index if prompted: `sessions` collection, `userId` ASC + `timestamp` DESC
+4. **Apple Watch companion:** In Firestore **Rules**, ensure your app can write to `pairingCodes` and that the iOS app can write to `users/{userId}/appleWatchMetrics`. Test mode often allows this; if "Get Pairing Code" does nothing, check the browser console (F12) and confirm rules allow `create` on `pairingCodes`.
 
 ---
 

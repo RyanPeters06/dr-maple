@@ -47,19 +47,22 @@ export const Dashboard = () => {
   };
 
   const handleGeneratePairingCode = async () => {
-    if (!user?.sub) return;
-    setIsGeneratingCode(true);
     setPairingError(null);
+    if (!user?.sub) {
+      setPairingError('Please sign out and sign in again to generate a code.');
+      return;
+    }
+    setIsGeneratingCode(true);
     try {
       const code = await createPairingCode(user.sub);
       if (code) {
         setPairingCode(code);
       } else {
-        setPairingError('Unable to generate a pairing code right now.');
+        setPairingError('Could not generate code. Check the browser console and Firestore rules for pairingCodes.');
       }
     } catch (err) {
-      console.error(err);
-      setPairingError('Unable to generate a pairing code right now.');
+      console.error('Pairing code error:', err);
+      setPairingError('Something went wrong. Check the browser console (F12).');
     } finally {
       setIsGeneratingCode(false);
     }
@@ -175,26 +178,26 @@ export const Dashboard = () => {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-col items-end gap-2">
+                  {pairingError && (
+                    <div className="w-full rounded-lg bg-red-900/30 border border-red-700/50 px-3 py-2 text-left">
+                      <p className="text-xs text-red-300">{pairingError}</p>
+                    </div>
+                  )}
                   <button
                     onClick={handleGeneratePairingCode}
-                    className="btn-primary px-3 py-1.5 text-xs"
+                    className="btn-primary px-3 py-1.5 text-xs disabled:opacity-60 disabled:cursor-wait"
                     disabled={isGeneratingCode}
                   >
                     {isGeneratingCode ? 'Generating…' : 'Get Pairing Code'}
                   </button>
                   {pairingCode && (
-                    <div className="mt-1 px-2 py-1 rounded-lg bg-gray-800 border border-gray-700">
+                    <div className="mt-1 px-3 py-2 rounded-lg bg-gray-800 border border-teal-700/50 w-full">
                       <p className="text-[10px] text-gray-500 uppercase tracking-wide">Pairing code</p>
-                      <p className="font-mono text-sm text-teal-400 tracking-[0.25em]">
+                      <p className="font-mono text-lg text-teal-400 tracking-[0.25em] mt-1">
                         {pairingCode}
                       </p>
                     </div>
-                  )}
-                  {pairingError && (
-                    <p className="text-[10px] text-red-400 mt-1 max-w-[160px] text-right">
-                      {pairingError}
-                    </p>
                   )}
                 </div>
               </div>
