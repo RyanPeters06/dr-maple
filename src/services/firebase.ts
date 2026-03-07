@@ -10,6 +10,8 @@ import {
   where,
   orderBy,
   Timestamp,
+  setDoc,
+  onSnapshot,
 } from 'firebase/firestore';
 import type { TriageResult } from '../constants';
 import type { TranscriptMessage } from '../hooks/useGemini';
@@ -44,6 +46,18 @@ export interface SessionRecord {
   triageResult: TriageResult;
   transcript: Pick<TranscriptMessage, 'role' | 'text'>[];
   duration?: number;
+}
+
+export interface AppleWatchMetrics {
+  avgHeartRate?: number | null;
+  stepsToday?: number;
+  activeEnergyKcal?: number;
+  exerciseMinutes?: number;
+  standHours?: number;
+  sleepDurationHours?: number | null;
+  sleepQuality?: string | null;
+  avgNoiseDbA?: number | null;
+  updatedAt?: string | null;
 }
 
 export const saveSession = async (
@@ -125,4 +139,83 @@ export const getSession = async (sessionId: string): Promise<SessionRecord | nul
     console.error('Failed to load session:', err);
     return null;
   }
+};
+
+const PAIRING_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const PAIRING_CODE_LENGTH = 6;
+
+const generatePairingCode = () => {
+  let code = '';
+  for (let i = 0; i < PAIRING_CODE_LENGTH; i++) {
+    const idx = Math.floor(Math.random() * PAIRING_CODE_CHARS.length);
+    code += PAIRING_CODE_CHARS[idx];
+  }
+  return code;
+};
+
+export const createPairingCode = async (userId: string): Promise<string | null> => {
+  const firestore = getDb();
+  if (!firestore) return null;
+
+  const code = generatePairingCode();
+
+  try {
+    const ref = doc(firestore, 'pairingCodes', code);
+    await setDoc(ref, {
+      userId,
+      createdAt: Timestamp.now(),
+    });
+    return code;
+  } catch (err) {
+    console.error('Failed to create pairing code:', err);
+    return null;
+  }
+};
+
+export const subscribeAppleWatchMetrics = (
+  userId: string,
+  onChange: (metrics: AppleWatchMetrics | null) => void
+): (() => void) | null => {
+  const firestore = getDb();
+  if (!firestore) {
+    onChange(null);
+    return null;
+  }
+
+  const metricsDoc = doc(firestore, 'users', userId, 'appleWatchMetrics', 'current');
+
+  const unsubscribe = onSnapshot(
+    metricsDoc,
+    snapshot => {
+      if (!snapshot.exists()) {
+        onChange(null);
+        return;
+      }
+      const data = snapshot.data();
+      const updatedAt =
+        data.updatedAt instanceof Timestamp
+          ? data.updatedAt.toDate().toISOString()
+          : data.updatedAt ?? null;
+
+      const metrics: AppleWatchMetrics = {
+        avgHeartRate: data.avgHeartRate ?? null,
+        stepsToday: data.stepsToday,
+        activeEnergyKcal: data.activeEnergyKcal,
+        exerciseMinutes: data.exerciseMinutes,
+        standHours: data.standHours,
+        sleepDurationHours: data.sleepDurationHours ?? null,
+        sleepQuality: data.sleepQuality ?? null,
+        avgNoiseDbA: data.avgNoiseDbA ?? null,
+        updatedAt,
+      };
+
+      onChange(metrics);
+    },
+    error => {
+      console.error('Failed to subscribe to Apple Watch metrics:', error);
+      onChange(null);
+    }
+  );
+
+  return unsubscribe;
 };

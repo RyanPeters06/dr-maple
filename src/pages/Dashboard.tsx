@@ -5,6 +5,8 @@ import { TRIAGE_LEVELS } from '../constants';
 import type { TriageLevel } from '../constants';
 import { ClinicMap } from '../components/ClinicMap';
 import { useState } from 'react';
+import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
+import { createPairingCode } from '../services/firebase';
 
 type DashTab = 'history' | 'map';
 
@@ -13,6 +15,10 @@ export const Dashboard = () => {
   const { user, logout } = useAuth0();
   const { sessions, isLoading, error, refresh } = useHealthHistory();
   const [activeTab, setActiveTab] = useState<DashTab>('history');
+  const { metrics: watchMetrics, isLoading: watchLoading } = useAppleWatchMetrics();
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [pairingError, setPairingError] = useState<string | null>(null);
 
   const formatDate = (iso: string) => {
     try {
@@ -38,6 +44,25 @@ export const Dashboard = () => {
   const getUrgencyStyle = (urgency: string) => {
     const level = TRIAGE_LEVELS[urgency as TriageLevel];
     return level ?? TRIAGE_LEVELS['Non-urgent'];
+  };
+
+  const handleGeneratePairingCode = async () => {
+    if (!user?.sub) return;
+    setIsGeneratingCode(true);
+    setPairingError(null);
+    try {
+      const code = await createPairingCode(user.sub);
+      if (code) {
+        setPairingCode(code);
+      } else {
+        setPairingError('Unable to generate a pairing code right now.');
+      }
+    } catch (err) {
+      console.error(err);
+      setPairingError('Unable to generate a pairing code right now.');
+    } finally {
+      setIsGeneratingCode(false);
+    }
   };
 
   return (
@@ -112,6 +137,66 @@ export const Dashboard = () => {
                     ? `I can see you've had ${sessions.length} session${sessions.length !== 1 ? 's' : ''} with me. How are you feeling today?`
                     : "You haven't had a session with me yet. Whenever you're ready, tap \"New Call\" above to get started."}
                 </p>
+              </div>
+            </div>
+
+            {/* Apple Watch companion + metrics */}
+            <div className="card mb-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-gray-800 flex items-center justify-center text-lg">
+                    ⌚️
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">Dr. Maple Watch Companion</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Connect your Apple Watch to share heart rate, sleep, and activity data with Dr. Maple.
+                    </p>
+                    {watchMetrics && (
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-gray-300">
+                        {typeof watchMetrics.avgHeartRate === 'number' && (
+                          <p>❤️ Avg HR (24h): <span className="font-semibold">{Math.round(watchMetrics.avgHeartRate)} bpm</span></p>
+                        )}
+                        {typeof watchMetrics.stepsToday === 'number' && (
+                          <p>🚶 Steps today: <span className="font-semibold">{watchMetrics.stepsToday}</span></p>
+                        )}
+                        {typeof watchMetrics.exerciseMinutes === 'number' && (
+                          <p>🏃 Exercise: <span className="font-semibold">{watchMetrics.exerciseMinutes} min</span></p>
+                        )}
+                        {typeof watchMetrics.sleepDurationHours === 'number' && (
+                          <p>😴 Sleep last night: <span className="font-semibold">{watchMetrics.sleepDurationHours.toFixed(1)} h</span></p>
+                        )}
+                      </div>
+                    )}
+                    {!watchMetrics && !watchLoading && (
+                      <p className="text-xs text-gray-600 mt-2">
+                        After pairing, open the Dr. Maple Watch app on your iPhone and tap &quot;Sync&quot; to send data here.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    onClick={handleGeneratePairingCode}
+                    className="btn-primary px-3 py-1.5 text-xs"
+                    disabled={isGeneratingCode}
+                  >
+                    {isGeneratingCode ? 'Generating…' : 'Get Pairing Code'}
+                  </button>
+                  {pairingCode && (
+                    <div className="mt-1 px-2 py-1 rounded-lg bg-gray-800 border border-gray-700">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">Pairing code</p>
+                      <p className="font-mono text-sm text-teal-400 tracking-[0.25em]">
+                        {pairingCode}
+                      </p>
+                    </div>
+                  )}
+                  {pairingError && (
+                    <p className="text-[10px] text-red-400 mt-1 max-w-[160px] text-right">
+                      {pairingError}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
