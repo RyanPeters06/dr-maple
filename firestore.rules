@@ -1,19 +1,31 @@
 rules_version = '2';
-// IMPORTANT: Deploy these rules or profile (and other data) will fail with "Missing or insufficient permissions".
-// Option A — Firebase Console: Firestore Database → Rules → paste this entire file → Publish.
-// Option B — CLI: npm i -g firebase-tools && firebase login && firebase use <your-project-id> && firebase deploy --only firestore:rules
+// Deploy: Firebase Console → Firestore Database → Rules → paste → Publish
+// OR: firebase deploy --only firestore:rules
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Call sessions (triage results + transcripts) — open for hackathon
     match /sessions/{sessionId} {
       allow read, write: if true;
     }
+
+    // Apple Watch pairing codes — temporary codes, open read/write
     match /pairingCodes/{code} {
       allow read, write: if true;
     }
+
+    // Apple Watch live metrics subcollection: users/{userId}/appleWatchMetrics/current
     match /users/{userId}/{document=**} {
       allow read, write: if true;
     }
+
+    // User health profile (age, allergies, medications, etc.)
     match /userProfiles/{userId} {
+      allow read, write: if true;
+    }
+
+    // Personal symptom diary
+    match /symptomLogs/{userId} {
       allow read, write: if true;
     }
   }

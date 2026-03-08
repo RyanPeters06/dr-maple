@@ -1,5 +1,19 @@
 import { useState, useRef, useCallback } from 'react';
-import { createDoctorChat, sendMessage, parseTriageResult, extractCleanText, MODEL_PRIORITY, type ChatSession, type AppleWatchContext } from '../services/gemini';
+import {
+  createDoctorChat,
+  sendMessage,
+  sendImageMessage,
+  parseTriageResult,
+  parseChoices,
+  parsePhotoRequest,
+  extractCleanText,
+  buildWellnessSuffix,
+  MODEL_PRIORITY,
+  type ChatSession,
+  type AppleWatchContext,
+  type VitalsContext,
+  type WellnessContext,
+} from '../services/gemini';
 import type { TriageResult } from '../constants';
 
 export interface TranscriptMessage {
@@ -8,11 +22,31 @@ export interface TranscriptMessage {
   timestamp: Date;
 }
 
+const processResponse = (
+  rawResponse: string,
+  setTriageResult: (r: TriageResult) => void,
+  setChoices: (c: string[] | null) => void,
+  setPhotoRequested: (v: boolean) => void
+): string => {
+  const triage = parseTriageResult(rawResponse);
+  if (triage) setTriageResult(triage);
+
+  const choices = parseChoices(rawResponse);
+  setChoices(choices);
+
+  const photoReq = parsePhotoRequest(rawResponse);
+  if (photoReq) setPhotoRequested(true);
+
+  return extractCleanText(rawResponse);
+};
+
 export const useGemini = () => {
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [triageResult, setTriageResult] = useState<TriageResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [choices, setChoices] = useState<string[] | null>(null);
+  const [photoRequested, setPhotoRequested] = useState(false);
   const chatRef = useRef<ChatSession | null>(null);
   const modelIndexRef = useRef(0);
 
@@ -21,14 +55,31 @@ export const useGemini = () => {
     setTranscript([]);
     setTriageResult(null);
     setError(null);
+    setChoices(null);
+    setPhotoRequested(false);
   }, []);
 
   const startCall = useCallback(async (
-    vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null },
-    appleWatch?: AppleWatchContext | null
+    vitals?: VitalsContext,
+    appleWatch?: AppleWatchContext | null,
+    wellness?: WellnessContext | null
   ): Promise<string> => {
     setIsThinking(true);
     setError(null);
+
+    const appleWatchConnected = appleWatch != null && (
+      appleWatch.avgHeartRate != null ||
+      appleWatch.stepsToday != null ||
+      appleWatch.exerciseMinutes != null ||
+      appleWatch.sleepDurationHours != null
+    );
+
+    const choices = appleWatchConnected
+      ? `CHOICES:["General Guidance","Vital Check-In","Non-Emergency Diagnosis","Wellness Review"]`
+      : `CHOICES:["General Guidance","Vital Check-In","Non-Emergency Diagnosis"]`;
+
+    const wellnessSuffix = (wellness && appleWatchConnected) ? buildWellnessSuffix(wellness) : '';
+    const greetingMessage = `The patient has just joined the video call. Please warmly greet them as Dr. Maple and present the consultation mode options using exactly this marker:\n${choices}${wellnessSuffix}`;
 
     for (let i = modelIndexRef.current; i < MODEL_PRIORITY.length; i++) {
       try {
@@ -36,13 +87,11 @@ export const useGemini = () => {
         modelIndexRef.current = i;
         const rawResponse = await sendMessage(
           chatRef.current!,
-          'The patient has just joined the video call. Please warmly greet them as Dr. Maple and ask what brings them in today.',
+          greetingMessage,
           vitals,
           appleWatch
         );
-        const cleanText = extractCleanText(rawResponse);
-        const triage = parseTriageResult(rawResponse);
-        if (triage) setTriageResult(triage);
+        const cleanText = processResponse(rawResponse, r => setTriageResult(r), setChoices, setPhotoRequested);
         setTranscript([{ role: 'doctor', text: cleanText, timestamp: new Date() }]);
         setIsThinking(false);
         return cleanText;
@@ -62,7 +111,7 @@ export const useGemini = () => {
 
   const sendPatientMessage = useCallback(async (
     patientText: string,
-    vitals?: { heartRate?: number | null; breathingRate?: number | null; stressLevel?: number | null },
+    vitals?: VitalsContext,
     appleWatch?: AppleWatchContext | null
   ): Promise<string> => {
     if (!chatRef.current) {
@@ -71,13 +120,12 @@ export const useGemini = () => {
     }
     setIsThinking(true);
     setError(null);
+    setChoices(null);
     setTranscript(prev => [...prev, { role: 'patient', text: patientText, timestamp: new Date() }]);
 
     try {
       const rawResponse = await sendMessage(chatRef.current, patientText, vitals, appleWatch);
-      const cleanText = extractCleanText(rawResponse);
-      const triage = parseTriageResult(rawResponse);
-      if (triage) setTriageResult(triage);
+      const cleanText = processResponse(rawResponse, r => setTriageResult(r), setChoices, setPhotoRequested);
       setTranscript(prev => [...prev, { role: 'doctor', text: cleanText, timestamp: new Date() }]);
       return cleanText;
     } catch (err) {
@@ -90,13 +138,70 @@ export const useGemini = () => {
     }
   }, []);
 
+  const sendPhotoMessage = useCallback(async (
+    imageBase64: string,
+    mimeType: string,
+    vitals?: VitalsContext,
+    appleWatch?: AppleWatchContext | null
+  ): Promise<string> => {
+    if (!chatRef.current) {
+      setError('Session expired — please end and restart the call.');
+      return '';
+    }
+    setIsThinking(true);
+    setError(null);
+    setPhotoRequested(false);
+    setChoices(null);
+    setTranscript(prev => [...prev, { role: 'patient', text: '[Photo shared with Dr. Maple]', timestamp: new Date() }]);
+
+    try {
+      const rawResponse = await sendImageMessage(
+        chatRef.current,
+        imageBase64,
+        mimeType,
+        'The patient has shared a photo of their symptom for you to examine. Please analyze it carefully and give your best assessment.',
+        vitals,
+        appleWatch
+      );
+      const cleanText = processResponse(rawResponse, r => setTriageResult(r), setChoices, setPhotoRequested);
+      setTranscript(prev => [...prev, { role: 'doctor', text: cleanText, timestamp: new Date() }]);
+      return cleanText;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('sendPhotoMessage error:', err);
+      setError(`Dr. Maple couldn't analyze the photo: ${msg}`);
+      return '';
+    } finally {
+      setIsThinking(false);
+    }
+  }, []);
+
+  const dismissPhotoRequest = useCallback(() => {
+    setPhotoRequested(false);
+  }, []);
+
   const resetChat = useCallback(() => {
     chatRef.current = null;
     setTranscript([]);
     setTriageResult(null);
     setIsThinking(false);
     setError(null);
+    setChoices(null);
+    setPhotoRequested(false);
   }, []);
 
-  return { transcript, isThinking, triageResult, error, initChat, startCall, sendPatientMessage, resetChat };
+  return {
+    transcript,
+    isThinking,
+    triageResult,
+    error,
+    choices,
+    photoRequested,
+    initChat,
+    startCall,
+    sendPatientMessage,
+    sendPhotoMessage,
+    dismissPhotoRequest,
+    resetChat,
+  };
 };
