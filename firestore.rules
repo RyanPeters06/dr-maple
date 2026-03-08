@@ -1,6 +1,7 @@
 rules_version = '2';
-// Copy these rules into Firebase Console → Firestore Database → Rules → paste → Publish
-// This allows the web app to create pairing codes and the iOS app to write watch metrics.
+// IMPORTANT: Deploy these rules or profile (and other data) will fail with "Missing or insufficient permissions".
+// Option A — Firebase Console: Firestore Database → Rules → paste this entire file → Publish.
+// Option B — CLI: npm i -g firebase-tools && firebase login && firebase use <your-project-id> && firebase deploy --only firestore:rules
 service cloud.firestore {
   match /databases/{database}/documents {
     match /sessions/{sessionId} {
@@ -10,6 +11,9 @@ service cloud.firestore {
       allow read, write: if true;
     }
     match /users/{userId}/{document=**} {
+      allow read, write: if true;
+    }
+    match /userProfiles/{userId} {
       allow read, write: if true;
     }
   }

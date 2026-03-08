@@ -4,6 +4,7 @@ import { Landing } from './pages/Landing';
 import { Call } from './pages/Call';
 import { Dashboard } from './pages/Dashboard';
 import { Report } from './pages/Report';
+import { Profile } from './pages/Profile';
 import { AuthGate } from './components/AuthGate';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -46,6 +47,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Report />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

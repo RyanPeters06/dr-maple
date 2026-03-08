@@ -1,10 +1,7 @@
 import type { AppleWatchMetrics } from '../services/firebase';
 
-function formatSleepHours(hours: number): string {
-  if (hours < 1) return `${Math.round(hours * 60)} min`;
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+function formatActiveEnergy(kcal: number): string {
+  return `${kcal.toFixed(2)} kcal`;
 }
 
 function formatUpdatedAt(iso: string | null | undefined): string {
@@ -45,9 +42,9 @@ function StatCard({ icon, label, value, sub, accent = 'rose' }: StatCardProps) {
     <div className={`rounded-2xl border p-5 ${accentClasses[accent]} transition-shadow hover:shadow-md`}>
       <div className="flex items-start gap-3">
         <span className="text-2xl flex-shrink-0" aria-hidden>{icon}</span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <p className="text-xs font-semibold uppercase tracking-wider opacity-80">{label}</p>
-          <p className="text-xl font-bold mt-0.5 tabular-nums">{value}</p>
+          <p className="text-xl font-bold mt-0.5 tabular-nums break-all" title={typeof value === 'string' ? value : String(value)}>{value}</p>
           {sub && <p className="text-xs mt-1 opacity-90">{sub}</p>}
         </div>
       </div>
@@ -83,20 +80,16 @@ export function WatchCompanionStats({ metrics, isLoading }: WatchCompanionStatsP
     );
   }
 
-  const hasAny =
-    typeof metrics.avgHeartRate === 'number' ||
-    typeof metrics.stepsToday === 'number' ||
-    typeof metrics.sleepDurationHours === 'number' ||
-    typeof metrics.exerciseMinutes === 'number' ||
+  // Only show "more" stats here — Sleep, Heart rate, Exercise, Steps are in their own sections above
+  const hasMore =
     typeof metrics.standHours === 'number' ||
     typeof metrics.activeEnergyKcal === 'number' ||
-    (metrics.sleepQuality != null && metrics.sleepQuality !== '') ||
     typeof metrics.avgNoiseDbA === 'number';
 
-  if (!hasAny) {
+  if (!hasMore) {
     return (
-      <div className="text-center py-16 px-6">
-        <p className="text-gray-500 text-sm">Watch connected. Sync from the app to see heart rate, sleep, and activity.</p>
+      <div className="text-center py-10 px-6 rounded-2xl border border-gray-100 bg-gray-50/50">
+        <p className="text-gray-500 text-sm">Stand hours, active energy, and noise exposure will appear here when synced.</p>
         {metrics.updatedAt && (
           <p className="text-gray-400 text-xs mt-2">Last sync: {formatUpdatedAt(metrics.updatedAt)}</p>
         )}
@@ -107,39 +100,6 @@ export function WatchCompanionStats({ metrics, isLoading }: WatchCompanionStatsP
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {typeof metrics.sleepDurationHours === 'number' && (
-          <StatCard
-            icon="😴"
-            label="Sleep last night"
-            value={formatSleepHours(metrics.sleepDurationHours)}
-            sub={metrics.sleepQuality ?? undefined}
-            accent="violet"
-          />
-        )}
-        {typeof metrics.avgHeartRate === 'number' && (
-          <StatCard
-            icon="❤️"
-            label="Avg heart rate (24h)"
-            value={`${Math.round(metrics.avgHeartRate)} bpm`}
-            accent="rose"
-          />
-        )}
-        {typeof metrics.stepsToday === 'number' && (
-          <StatCard
-            icon="🚶"
-            label="Steps today"
-            value={metrics.stepsToday.toLocaleString()}
-            accent="emerald"
-          />
-        )}
-        {typeof metrics.exerciseMinutes === 'number' && (
-          <StatCard
-            icon="🏃"
-            label="Exercise"
-            value={`${metrics.exerciseMinutes} min`}
-            accent="amber"
-          />
-        )}
         {typeof metrics.standHours === 'number' && (
           <StatCard
             icon="🧍"
@@ -153,7 +113,7 @@ export function WatchCompanionStats({ metrics, isLoading }: WatchCompanionStatsP
           <StatCard
             icon="🔥"
             label="Active energy"
-            value={`${metrics.activeEnergyKcal} kcal`}
+            value={formatActiveEnergy(metrics.activeEnergyKcal)}
             accent="amber"
           />
         )}

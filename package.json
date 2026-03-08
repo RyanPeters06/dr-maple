@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:rules": "node scripts/deploy-rules.mjs"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.2.4",
@@ -21,6 +22,7 @@
     "react-router-dom": "^6.28.1"
   },
   "devDependencies": {
+    "firebase-tools": "^13.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

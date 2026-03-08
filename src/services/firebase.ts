@@ -12,6 +12,7 @@ import {
   Timestamp,
   setDoc,
   onSnapshot,
+  deleteDoc,
 } from 'firebase/firestore';
 import type { TriageResult } from '../constants';
 import type { TranscriptMessage } from '../hooks/useGemini';
@@ -226,4 +227,74 @@ export const subscribeAppleWatchMetrics = (
   );
 
   return unsubscribe;
+};
+
+/** Clears Apple Watch metrics for the user (disconnect on web — stops showing watch data). */
+export const clearAppleWatchMetrics = async (userId: string): Promise<void> => {
+  const firestore = getDb();
+  if (!firestore) return;
+  const metricsRef = doc(firestore, 'users', userId, 'appleWatchMetrics', 'current');
+  await deleteDoc(metricsRef);
+};
+
+// ─── User profile (demographics, medical history, medications, allergies) ───
+
+export interface UserProfile {
+  // Demographics (for future averages / personalization)
+  sex?: string | null;
+  heightCm?: number | null;
+  weightKg?: number | null;
+  dateOfBirth?: string | null; // ISO date, used to compute age
+  // Medical
+  pastMedicalProblems?: string[]; // e.g. ["Asthma", "Hypertension"]
+  currentMedications?: string[];  // e.g. ["Lisinopril 10mg", "Vitamin D"]
+  allergies?: string[];          // e.g. ["Penicillin", "Peanuts"]
+  updatedAt?: string | null;
+}
+
+const USER_PROFILE_COLLECTION = 'userProfiles';
+
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  const firestore = getDb();
+  if (!firestore) return null;
+  try {
+    const ref = doc(firestore, USER_PROFILE_COLLECTION, userId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return {
+      sex: data.sex ?? null,
+      heightCm: data.heightCm ?? null,
+      weightKg: data.weightKg ?? null,
+      dateOfBirth: data.dateOfBirth ?? null,
+      pastMedicalProblems: Array.isArray(data.pastMedicalProblems) ? data.pastMedicalProblems : [],
+      currentMedications: Array.isArray(data.currentMedications) ? data.currentMedications : [],
+      allergies: Array.isArray(data.allergies) ? data.allergies : [],
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt ?? null,
+    };
+  } catch (err) {
+    console.error('Failed to get user profile:', err);
+    return null;
+  }
+};
+
+export const saveUserProfile = async (userId: string, profile: UserProfile): Promise<boolean> => {
+  const firestore = getDb();
+  if (!firestore) {
+    const err = new Error('Firebase is not configured. Add VITE_FIREBASE_* env vars.');
+    console.error(err.message);
+    throw err;
+  }
+  const ref = doc(firestore, USER_PROFILE_COLLECTION, userId);
+  await setDoc(ref, {
+    sex: profile.sex ?? null,
+    heightCm: profile.heightCm ?? null,
+    weightKg: profile.weightKg ?? null,
+    dateOfBirth: profile.dateOfBirth ?? null,
+    pastMedicalProblems: profile.pastMedicalProblems ?? [],
+    currentMedications: profile.currentMedications ?? [],
+    allergies: profile.allergies ?? [],
+    updatedAt: Timestamp.now(),
+  }, { merge: true });
+  return true;
 };
