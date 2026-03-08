@@ -9,6 +9,28 @@ export const stopSpeaking = () => {
     currentAudio.src = '';
     currentAudio = null;
   }
+  window.speechSynthesis?.cancel();
+};
+
+const speakWithBrowser = (text: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-CA';
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+
+    const voices = window.speechSynthesis.getVoices();
+    const preferred =
+      voices.find(v => v.lang === 'en-US' && (v.name.includes('David') || v.name.includes('Mark') || v.name.includes('Guy') || v.name.includes('Alex'))) ??
+      voices.find(v => v.lang === 'en-US' && !v.name.includes('Female') && !v.name.includes('Zira')) ??
+      voices.find(v => v.lang.startsWith('en') && !v.name.includes('Female'));
+    if (preferred) utterance.voice = preferred;
+
+    utterance.onend = () => resolve();
+    utterance.onerror = (e) => reject(new Error(`Browser TTS error: ${e.error}`));
+    window.speechSynthesis.speak(utterance);
+  });
 };
 
 export const speakText = async (text: string, stressLevel?: number | null): Promise<void> => {
@@ -16,11 +38,10 @@ export const speakText = async (text: string, stressLevel?: number | null): Prom
 
   const apiKey = API_KEY();
   if (!apiKey) {
-    console.warn('ElevenLabs API key not set — skipping TTS');
-    return;
+    console.warn('ElevenLabs API key not set — using browser TTS');
+    return speakWithBrowser(text);
   }
 
-  // Use a calmer, more stable voice when patient stress is high
   const stability = stressLevel && stressLevel > 60 ? 0.85 : 0.65;
 
   try {
@@ -34,12 +55,12 @@ export const speakText = async (text: string, stressLevel?: number | null): Prom
         },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_turbo_v2',
+          model_id: 'eleven_turbo_v2_5',
           voice_settings: {
             stability,
-            similarity_boost: 0.75,
-            style: 0.3,
-            use_speaker_boost: true,
+            similarity_boost: 0.8,
+            style: 0.1,
+            use_speaker_boost: false,
           },
         }),
       }
@@ -47,7 +68,8 @@ export const speakText = async (text: string, stressLevel?: number | null): Prom
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`ElevenLabs error ${response.status}: ${err}`);
+      console.warn(`ElevenLabs failed (${response.status}), falling back to browser TTS`);
+      return speakWithBrowser(text);
     }
 
     const audioBlob = await response.blob();
@@ -68,7 +90,7 @@ export const speakText = async (text: string, stressLevel?: number | null): Prom
       audio.play().catch(reject);
     });
   } catch (err) {
-    console.error('ElevenLabs TTS failed:', err);
-    // Gracefully degrade — no speech but app continues
+    console.warn('ElevenLabs TTS failed, falling back to browser TTS:', err);
+    return speakWithBrowser(text);
   }
 };

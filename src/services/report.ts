@@ -213,3 +213,56 @@ export const generateHealthReport = (data: ReportData): void => {
 
   doc.save(`Dr-Nova-Report-${data.date.replace(/\//g, '-')}-${Date.now()}.pdf`);
 };
+
+export const downloadTranscriptPdf = (transcript: TranscriptMessage[], date?: string): void => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 20;
+  const contentW = pageW - margin * 2;
+  const reportDate = date ?? new Date().toLocaleDateString('en-CA');
+
+  // Header bar
+  doc.setFillColor(...TEAL);
+  doc.rect(0, 0, pageW, 40, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Dr. Maple', margin, 18);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Session Conversation Transcript', margin, 27);
+  doc.text(`Date: ${reportDate}`, margin, 33);
+
+  // Transcript table
+  autoTable(doc, {
+    startY: 50,
+    head: [['Speaker', 'Message']],
+    body: transcript.map(m => [
+      m.role === 'doctor' ? 'Dr. Maple' : 'Patient',
+      m.text,
+    ]),
+    headStyles: { fillColor: TEAL, textColor: [255, 255, 255], fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: contentW - 28 } },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 9, overflow: 'linebreak', cellPadding: 4 },
+  });
+
+  // Footer on each page
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.setFontSize(7);
+    doc.setTextColor(160, 160, 160);
+    doc.text(
+      'DISCLAIMER: This transcript is a record of an AI-assisted triage session and is NOT a medical record or diagnosis. ' +
+      'Always consult a licensed healthcare professional for medical advice. In emergencies, call 911.',
+      margin, pageH - 10,
+      { maxWidth: contentW }
+    );
+    doc.text(`Page ${i} of ${totalPages}`, pageW - margin, pageH - 5, { align: 'right' });
+  }
+
+  doc.save(`Dr-Maple-Transcript-${reportDate.replace(/\//g, '-')}-${Date.now()}.pdf`);
+};

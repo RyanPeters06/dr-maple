@@ -30,9 +30,9 @@ TRIAGE_RESULT:
 Urgency must be one of: "Emergency", "Urgent", "Semi-urgent", "Non-urgent". Start by greeting the patient and asking what brings them in today.`;
 
 const MODEL_PRIORITY = [
-  'gemini-1.5-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-2.0-flash',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-3-flash-preview',
 ];
 
 export type ChatSession = ReturnType<ReturnType<typeof genAI.getGenerativeModel>['startChat']>;
@@ -45,7 +45,7 @@ export const createDoctorChat = (modelName = MODEL_PRIORITY[0]): ChatSession => 
   const chat = model.startChat({
     history: [],
     generationConfig: {
-      maxOutputTokens: 300,
+      maxOutputTokens: 1000,
       temperature: 0.8,
     },
   });

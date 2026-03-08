@@ -152,13 +152,13 @@ export const Dashboard = () => {
 
   const watchPaired = watchMetrics != null;
 
-  const navItems: { id: DashSection | 'call'; icon: string; label: string; action: () => void }[] = [
-    { id: 'call',        icon: '📞', label: 'New Call',         action: () => navigate('/call') },
-    { id: 'home',        icon: '🏠', label: 'Home',             action: () => setActiveSection('home') },
-    { id: 'history',     icon: '📋', label: 'Health History',   action: () => setActiveSection('history') },
-    { id: 'watch',       icon: '⌚️', label: 'My Wellness',      action: () => setActiveSection('watch') },
-    { id: 'map',         icon: '🗺️', label: 'Find a Clinic',    action: () => setActiveSection('map') },
-    { id: 'specialists', icon: '👨‍⚕️', label: 'Find a Specialist', action: () => setActiveSection('specialists') },
+  const navItems: { id: DashSection | 'call'; label: string; action: () => void }[] = [
+    { id: 'call',        label: 'New Call',          action: () => navigate('/call') },
+    { id: 'home',        label: 'Home',              action: () => setActiveSection('home') },
+    { id: 'history',     label: 'Health History',    action: () => setActiveSection('history') },
+    { id: 'watch',       label: 'My Wellness',       action: () => setActiveSection('watch') },
+    { id: 'map',         label: 'Find a Clinic',     action: () => setActiveSection('map') },
+    { id: 'specialists', label: 'Find a Specialist', action: () => setActiveSection('specialists') },
     // Quick Screening left in the back for now — section still exists, not in nav
     // { id: 'screening',   icon: '❤️', label: 'Quick Screening',  action: () => setActiveSection('screening') },
   ];
@@ -192,7 +192,6 @@ export const Dashboard = () => {
                   : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
               }`}
             >
-              <span className="text-base flex-shrink-0">{item.icon}</span>
               <span>{item.label}</span>
             </button>
           ))}

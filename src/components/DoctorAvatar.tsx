@@ -1,9 +1,25 @@
 interface DoctorAvatarProps {
   isSpeaking: boolean;
   isListening?: boolean;
+  isThinking?: boolean;
 }
 
-export const DoctorAvatar = ({ isSpeaking, isListening }: DoctorAvatarProps) => {
+const getAvatarImage = (isSpeaking: boolean, isListening: boolean, isThinking: boolean) => {
+  if (isListening) return '/mascot-listening.png';
+  if (isSpeaking)  return '/mascot-talking.png';
+  if (isThinking)  return '/mascot-thinking.png';
+  return '/mascot-wave.png';
+};
+
+const getAvatarTranslate = (isSpeaking: boolean, isListening: boolean): string => {
+  if (isListening) return 'translateY(22%)';
+  if (isSpeaking)  return 'translateY(17%)';
+  return 'translateY(12px)';
+};
+
+export const DoctorAvatar = ({ isSpeaking, isListening = false, isThinking = false }: DoctorAvatarProps) => {
+  const avatarSrc = getAvatarImage(isSpeaking, isListening, isThinking);
+
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Avatar */}
@@ -17,12 +33,15 @@ export const DoctorAvatar = ({ isSpeaking, isListening }: DoctorAvatarProps) => 
         <div className={`relative w-64 h-64 rounded-full overflow-hidden border-4 shadow-xl transition-all duration-300 ${
           isSpeaking  ? 'border-rose-400 shadow-rose-200' :
           isListening ? 'border-red-400 shadow-red-200'   :
+          isThinking  ? 'border-amber-300 shadow-amber-100':
                         'border-rose-200 shadow-rose-100'
         } bg-rose-50`}>
           <img
-            src="/mascot-wave.png"
+            key={avatarSrc}
+            src={avatarSrc}
             alt="Dr. Maple"
             className="w-full h-full object-contain object-center scale-105"
+            style={{ transform: `scale(1.05) ${getAvatarTranslate(isSpeaking, isListening)}` }}
           />
         </div>
       </div>

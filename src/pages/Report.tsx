@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { HealthReport } from '../components/HealthReport';
 import { ClinicMap } from '../components/ClinicMap';
 import { getSession } from '../services/firebase';
+import { downloadTranscriptPdf } from '../services/report';
 import type { TriageResult } from '../constants';
 import type { TranscriptMessage } from '../hooks/useGemini';
 
@@ -11,6 +12,7 @@ interface SessionData {
   transcript: TranscriptMessage[];
   duration?: number;
   timestamp?: string;
+  initialTab?: Tab;
 }
 
 type Tab = 'report' | 'map' | 'transcript';
@@ -25,9 +27,18 @@ export const Report = () => {
 
   useEffect(() => {
     const stateData = (location.state as SessionData | null);
-    if (stateData?.triageResult) { setSession(stateData); setLoading(false); return; }
+    if (stateData?.triageResult) {
+      setSession(stateData);
+      if (stateData.initialTab) setActiveTab(stateData.initialTab);
+      setLoading(false);
+      return;
+    }
     if (id && id !== 'preview') {
-      getSession(id).then(data => { if (data) setSession(data as SessionData); }).catch(console.error).finally(() => setLoading(false));
+      getSession(id).then(data => {
+        if (data) setSession(data as SessionData);
+        const initialTab = (location.state as { initialTab?: Tab } | null)?.initialTab;
+        if (initialTab) setActiveTab(initialTab);
+      }).catch(console.error).finally(() => setLoading(false));
     } else { setLoading(false); }
   }, [id, location.state]);
 
@@ -90,7 +101,20 @@ export const Report = () => {
         )}
         {activeTab === 'transcript' && (
           <div className="max-w-xl mx-auto space-y-3">
-            <h2 className="font-bold text-gray-800 mb-4">Session Transcript</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-gray-800">Session Transcript</h2>
+              {session.transcript?.length > 0 && (
+                <button
+                  onClick={() => downloadTranscriptPdf(
+                    session.transcript,
+                    session.timestamp ? new Date(session.timestamp).toLocaleDateString('en-CA') : new Date().toLocaleDateString('en-CA')
+                  )}
+                  className="text-sm text-rose-600 border border-rose-200 rounded-lg px-3 py-1.5 hover:bg-rose-50 transition-colors"
+                >
+                  Download PDF
+                </button>
+              )}
+            </div>
             {session.transcript?.length > 0 ? session.transcript.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'doctor' ? '' : 'flex-row-reverse'}`}>
                 <span className="text-xl flex-shrink-0">{msg.role === 'doctor' ? '🩺' : '🧑'}</span>

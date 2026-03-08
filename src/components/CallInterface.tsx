@@ -9,6 +9,7 @@ import { usePresage } from '../hooks/usePresage';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useRecorder } from '../hooks/useRecorder';
 import { saveSession } from '../services/firebase';
+import { downloadTranscriptPdf } from '../services/report';
 import type { TriageResult } from '../constants';
 
 type CallState = 'idle' | 'starting' | 'active' | 'ended';
@@ -28,7 +29,7 @@ export const CallInterface = () => {
   const durationRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { transcript, isThinking, triageResult, error: geminiError, initChat, startCall, sendPatientMessage } = useGemini();
-  const { speak, stop: stopSpeaking, isSpeaking } = useElevenLabs();
+  const { speak, stop: stopSpeaking, isSpeaking, ttsError } = useElevenLabs();
   const { vitals, isReady: presageReady } = usePresage(videoRef);
   const { metrics: watchMetrics } = useAppleWatchMetrics();
   const { startRecording, stopRecording, downloadRecording } = useRecorder();
@@ -176,16 +177,32 @@ export const CallInterface = () => {
           )}
 
           <div className="flex flex-col gap-3">
+            <button
+              onClick={() => downloadTranscriptPdf(transcript, new Date().toLocaleDateString('en-CA'))}
+              className="btn-ghost w-full text-center"
+            >
+              Download Conversation Transcript
+            </button>
             {triageResult && (
               <button
                 onClick={() => savedSessionId ? navigate(`/report/${savedSessionId}`) : navigate('/report/preview', { state: { triageResult, transcript } })}
                 className="btn-primary w-full text-center"
               >
-                📄 View & Download Health Report
+                Download Doctor Report
+              </button>
+            )}
+            {triageResult && (
+              <button
+                onClick={() => savedSessionId
+                  ? navigate(`/report/${savedSessionId}`, { state: { initialTab: 'map' } })
+                  : navigate('/report/preview', { state: { triageResult, transcript, initialTab: 'map' } })}
+                className="btn-ghost w-full text-center"
+              >
+                Find Nearby Clinics
               </button>
             )}
             <button onClick={() => navigate('/dashboard')} className="btn-ghost w-full text-center">
-              📊 Go to My Dashboard
+              Go to My Dashboard
             </button>
             <button onClick={() => { setCallState('idle'); setSavedSessionId(null); }} className="text-gray-400 hover:text-rose-500 text-sm text-center transition-colors">
               Start Another Call
@@ -220,7 +237,7 @@ export const CallInterface = () => {
       {/* Main call area */}
       <div className="flex-1 relative flex items-center justify-center min-h-0 bg-gradient-to-b from-white to-rose-50">
         <div className="z-10">
-          <DoctorAvatar isSpeaking={isSpeaking} isListening={isListening} />
+          <DoctorAvatar isSpeaking={isSpeaking} isListening={isListening} isThinking={isThinking} />
         </div>
 
         {/* Patient PiP */}
@@ -248,10 +265,19 @@ export const CallInterface = () => {
           </div>
         )}
 
-        {/* Error banner */}
-        {geminiError && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-2 rounded-xl shadow-md max-w-xs text-center">
-            ⚠️ {geminiError}
+        {/* Error banners */}
+        {(geminiError || ttsError) && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex flex-col gap-2 max-w-xs w-full">
+            {geminiError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-2 rounded-xl shadow-md text-center">
+                ⚠️ {geminiError}
+              </div>
+            )}
+            {ttsError && (
+              <div className="bg-orange-50 border border-orange-200 text-orange-600 text-xs px-4 py-2 rounded-xl shadow-md text-center">
+                🔇 Voice error: {ttsError}
+              </div>
+            )}
           </div>
         )}
 
