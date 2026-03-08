@@ -32,6 +32,15 @@ Canadians are left making a difficult, stressful choice every time they feel unw
 > *Talk to Dr. Maple. Describe how you feel. Get a clear answer in under 2 minutes.*
 
 <div align="center">
+  <a href="https://www.youtube.com/watch?v=sT9Q34yI6rw" target="_blank">
+    <img src="https://img.youtube.com/vi/sT9Q34yI6rw/maxresdefault.jpg" alt="Dr. Maple Demo Video" width="80%" />
+    <br/>
+    <strong>▶ Watch the demo on YouTube</strong>
+  </a>
+</div>
+<br/>
+
+<div align="center">
   <img src="screenshots/landing-page.png" alt="Dr. Maple landing page" width="100%" />
   <br/><br/>
   <img src="screenshots/active-call.png" alt="Active call with Dr. Maple" width="100%" />
