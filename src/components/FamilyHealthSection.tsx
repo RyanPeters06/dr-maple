@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import type { ChildProfile, VaccineEntry, GrowthEntry, MedicationEntry } from '../services/firebase';
 
 type FamilySubSection = 'profiles' | 'vaccines' | 'growth' | 'medication';
@@ -55,10 +55,10 @@ export function FamilyHealthSection({
   ageFromDateOfBirth,
 }: FamilyHealthSectionProps) {
   const tabs: { id: FamilySubSection; label: string; icon: string }[] = [
-    { id: 'profiles', label: 'Child profiles', icon: '≡ƒæ╢' },
-    { id: 'vaccines', label: 'Vaccines', icon: '≡ƒÆë' },
-    { id: 'growth', label: 'Height & weight', icon: '≡ƒôê' },
-    { id: 'medication', label: 'Medication', icon: '≡ƒÆè' },
+    { id: 'profiles',   label: 'Child profiles',  icon: '' },
+    { id: 'vaccines',   label: 'Vaccines',         icon: '' },
+    { id: 'growth',     label: 'Height & weight',  icon: '' },
+    { id: 'medication', label: 'Medication',        icon: '' },
   ];
 
   const selectedChild = selectedChildId ? children.find(c => c.id === selectedChildId) : null;
@@ -220,7 +220,7 @@ export function FamilyHealthSection({
         </div>
       ) : (
         <>
-          {/* ΓöÇΓöÇ Child profiles ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */}
+          {/* Child profiles */}
           {familySubSection === 'profiles' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -238,7 +238,7 @@ export function FamilyHealthSection({
                   <p className="text-gray-600 font-medium mb-1">No child profiles yet</p>
                   <p className="text-sm text-gray-500 mb-4">Add your first child to start tracking vaccines, growth, and medication.</p>
                   <button type="button" onClick={() => openChildForm(null)} className="text-rose-600 font-medium text-sm hover:underline">
-                    Add your first child ΓåÆ
+                    Add your first child
                   </button>
                 </div>
               ) : (
@@ -249,7 +249,7 @@ export function FamilyHealthSection({
                       className="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm hover:border-rose-200 transition-all flex flex-col"
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-xl flex-shrink-0">≡ƒæ╢</div>
+                        <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-xl flex-shrink-0 text-rose-400 font-bold">+</div>
                         <div className="flex gap-1">
                           <button
                             type="button"
@@ -284,7 +284,7 @@ export function FamilyHealthSection({
             </div>
           )}
 
-          {/* ΓöÇΓöÇ Vaccines ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */}
+          {/* Vaccines */}
           {familySubSection === 'vaccines' && (
             <div className="space-y-6 max-w-2xl">
               {children.length === 0 ? (
@@ -363,7 +363,7 @@ export function FamilyHealthSection({
                           disabled={childrenSaving || !vaccineName.trim()}
                           className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50"
                         >
-                          {childrenSaving ? 'SavingΓÇª' : 'Add vaccine'}
+                          {childrenSaving ? 'Saving...' : 'Add vaccine'}
                         </button>
                       </div>
                       <div>
@@ -395,7 +395,7 @@ export function FamilyHealthSection({
             </div>
           )}
 
-          {/* ΓöÇΓöÇ Height & weight ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */}
+          {/* Height & weight */}
           {familySubSection === 'growth' && (
             <div className="space-y-6 max-w-2xl">
               {children.length === 0 ? (
@@ -454,7 +454,7 @@ export function FamilyHealthSection({
                           disabled={childrenSaving || (!growthHeight.trim() && !growthWeight.trim())}
                           className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-100 text-emerald-800 hover:bg-emerald-200 disabled:opacity-50"
                         >
-                          {childrenSaving ? 'SavingΓÇª' : 'Add entry'}
+                          {childrenSaving ? 'Saving...' : 'Add entry'}
                         </button>
                       </div>
                       <div>
@@ -488,7 +488,7 @@ export function FamilyHealthSection({
             </div>
           )}
 
-          {/* ΓöÇΓöÇ Medication ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */}
+          {/* Medication */}
           {familySubSection === 'medication' && (
             <div className="space-y-6 max-w-2xl">
               {children.length === 0 ? (
@@ -550,7 +550,7 @@ export function FamilyHealthSection({
                           disabled={childrenSaving || !medName.trim()}
                           className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-100 text-violet-800 hover:bg-violet-200 disabled:opacity-50"
                         >
-                          {childrenSaving ? 'SavingΓÇª' : 'Add medication'}
+                          {childrenSaving ? 'Saving...' : 'Add medication'}
                         </button>
                       </div>
                       <div>
@@ -623,7 +623,7 @@ export function FamilyHealthSection({
                   onChange={e => setChildSex(e.target.value)}
                   className="w-full rounded-lg border border-rose-100 px-3 py-2 text-sm focus:ring-2 focus:ring-rose-200 focus:border-rose-300"
                 >
-                  <option value="">ΓÇö</option>
+                  <option value="">--</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
@@ -644,7 +644,7 @@ export function FamilyHealthSection({
                 disabled={childrenSaving || !childName.trim()}
                 className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-50"
               >
-                {childrenSaving ? 'SavingΓÇª' : childFormEditing ? 'Save' : 'Add child'}
+                {childrenSaving ? 'Saving...' : childFormEditing ? 'Save' : 'Add child'}
               </button>
             </div>
           </div>
