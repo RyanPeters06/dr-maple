@@ -4,6 +4,7 @@ import { useHealthHistory } from '../hooks/useHealthHistory';
 import { TRIAGE_LEVELS } from '../constants';
 import type { TriageLevel } from '../constants';
 import { ClinicMap } from '../components/ClinicMap';
+import { WatchCompanionStats } from '../components/WatchCompanionStats';
 import { useState, useRef } from 'react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
@@ -149,7 +150,7 @@ export const Dashboard = () => {
         </div>
 
         {/* Section content */}
-        <div className={`flex-1 ${activeSection === 'map' ? '' : 'px-8 py-6'} min-h-0`}>
+        <div className={`flex-1 ${activeSection === 'map' ? '' : 'px-8 py-6'} min-h-0 overflow-auto`}>
 
           {/* ── Health History ─────────────────────────────────────────────── */}
           {activeSection === 'history' && (
@@ -223,68 +224,22 @@ export const Dashboard = () => {
 
           {/* ── Apple Watch ────────────────────────────────────────────────── */}
           {activeSection === 'watch' && (
-            <div className="max-w-xl">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Apple Watch Companion</h2>
+            <div className="max-w-xl space-y-6">
+              <h2 className="text-lg font-bold text-gray-800">Apple Watch Companion</h2>
+
+              {/* Pairing card */}
               <div className="card border border-rose-100">
                 <div className="flex items-start gap-4 mb-4">
                   <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center text-2xl flex-shrink-0">
                     ⌚️
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-800">Connect Your Apple Watch</p>
+                    <p className="font-semibold text-gray-800">Link Your Apple Watch</p>
                     <p className="text-sm text-gray-400 mt-0.5">
-                      Share heart rate, sleep, and activity data with Dr. Maple to improve your triage accuracy.
+                      Get a pairing code, enter it in the Dr. Maple Watch app on your iPhone, then tap Sync.
                     </p>
                   </div>
                 </div>
-
-                {watchMetrics ? (
-                  <div className="bg-rose-50 rounded-xl p-4 border border-rose-100 mb-4">
-                    <p className="text-xs font-semibold text-rose-400 uppercase tracking-wide mb-3">Live Watch Data</p>
-                    <div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
-                      {typeof watchMetrics.avgHeartRate === 'number' && (
-                        <div className="flex items-center gap-2">
-                          <span>❤️</span>
-                          <div>
-                            <p className="font-semibold text-gray-800">{Math.round(watchMetrics.avgHeartRate)} bpm</p>
-                            <p className="text-xs text-gray-400">Avg heart rate</p>
-                          </div>
-                        </div>
-                      )}
-                      {typeof watchMetrics.stepsToday === 'number' && (
-                        <div className="flex items-center gap-2">
-                          <span>🚶</span>
-                          <div>
-                            <p className="font-semibold text-gray-800">{watchMetrics.stepsToday.toLocaleString()}</p>
-                            <p className="text-xs text-gray-400">Steps today</p>
-                          </div>
-                        </div>
-                      )}
-                      {typeof watchMetrics.exerciseMinutes === 'number' && (
-                        <div className="flex items-center gap-2">
-                          <span>🏃</span>
-                          <div>
-                            <p className="font-semibold text-gray-800">{watchMetrics.exerciseMinutes} min</p>
-                            <p className="text-xs text-gray-400">Exercise</p>
-                          </div>
-                        </div>
-                      )}
-                      {typeof watchMetrics.sleepDurationHours === 'number' && (
-                        <div className="flex items-center gap-2">
-                          <span>😴</span>
-                          <div>
-                            <p className="font-semibold text-gray-800">{watchMetrics.sleepDurationHours.toFixed(1)} h</p>
-                            <p className="text-xs text-gray-400">Last night's sleep</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : !watchLoading ? (
-                  <p className="text-sm text-gray-400 mb-4">
-                    No watch data yet. Generate a pairing code below and enter it in the Dr. Maple app on your iPhone.
-                  </p>
-                ) : null}
 
                 <div className="space-y-3">
                   {pairingError && (
@@ -301,7 +256,7 @@ export const Dashboard = () => {
                   </button>
                   {pairingCode && (
                     <div className="px-4 py-3 rounded-xl bg-rose-50 border border-rose-200">
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Pairing code — enter in all caps on your phone</p>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Enter in Watch app (all caps)</p>
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-mono text-2xl text-rose-600 tracking-[0.3em] font-bold">{pairingCode}</p>
                         <button
@@ -315,6 +270,12 @@ export const Dashboard = () => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Health stats from watch */}
+              <div>
+                <h3 className="text-base font-semibold text-gray-800 mb-4">Your Health Stats</h3>
+                <WatchCompanionStats metrics={watchMetrics} isLoading={watchLoading} />
               </div>
             </div>
           )}
