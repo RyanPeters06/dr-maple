@@ -55,10 +55,10 @@ export function FamilyHealthSection({
   ageFromDateOfBirth,
 }: FamilyHealthSectionProps) {
   const tabs: { id: FamilySubSection; label: string; icon: string }[] = [
-    { id: 'profiles',   label: 'Child profiles',  icon: '' },
-    { id: 'vaccines',   label: 'Vaccines',         icon: '' },
-    { id: 'growth',     label: 'Height & weight',  icon: '' },
-    { id: 'medication', label: 'Medication',        icon: '' },
+    { id: 'profiles', label: 'Child profiles', icon: '👤' },
+    { id: 'vaccines', label: 'Vaccines', icon: '💉' },
+    { id: 'growth', label: 'Height & weight', icon: '📏' },
+    { id: 'medication', label: 'Medication', icon: '💊' },
   ];
 
   const selectedChild = selectedChildId ? children.find(c => c.id === selectedChildId) : null;
@@ -238,7 +238,7 @@ export function FamilyHealthSection({
                   <p className="text-gray-600 font-medium mb-1">No child profiles yet</p>
                   <p className="text-sm text-gray-500 mb-4">Add your first child to start tracking vaccines, growth, and medication.</p>
                   <button type="button" onClick={() => openChildForm(null)} className="text-rose-600 font-medium text-sm hover:underline">
-                    Add your first child
+                    Add your first child →
                   </button>
                 </div>
               ) : (
@@ -249,7 +249,7 @@ export function FamilyHealthSection({
                       className="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm hover:border-rose-200 transition-all flex flex-col"
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-xl flex-shrink-0 text-rose-400 font-bold">+</div>
+                        <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-xl flex-shrink-0">👤</div>
                         <div className="flex gap-1">
                           <button
                             type="button"
@@ -273,7 +273,7 @@ export function FamilyHealthSection({
                       <p className="text-sm text-gray-500">
                         DOB: {formatDate(child.dateOfBirth)}
                         {ageFromDateOfBirth(child.dateOfBirth) != null && (
-                          <span> ┬╖ {ageFromDateOfBirth(child.dateOfBirth)} years</span>
+                          <span> · {ageFromDateOfBirth(child.dateOfBirth)} years</span>
                         )}
                       </p>
                       {child.sex && <p className="text-xs text-gray-400 mt-0.5">{child.sex}</p>}
@@ -378,8 +378,8 @@ export function FamilyHealthSection({
                                   <p className="font-medium text-gray-800">{v.name}</p>
                                   <p className="text-xs text-gray-500">
                                     {formatDate(v.date)}
-                                    {v.expirationDate ? ` ┬╖ Expires ${formatDate(v.expirationDate)}` : ' ┬╖ No expiration'}
-                                    {v.notes ? ` ┬╖ ${v.notes}` : ''}
+                                    {v.expirationDate ? ` · Expires ${formatDate(v.expirationDate)}` : ' · No expiration'}
+                                    {v.notes ? ` · ${v.notes}` : ''}
                                   </p>
                                 </div>
                                 <button type="button" onClick={() => removeVaccine(selectedChild, v.id)} className="text-gray-400 hover:text-red-600 text-sm">Remove</button>
@@ -471,8 +471,8 @@ export function FamilyHealthSection({
                                   <div>
                                     <p className="text-sm text-gray-800">
                                       {formatDate(g.date)}
-                                      {g.heightCm != null && <span className="text-gray-600"> ┬╖ {g.heightCm} cm</span>}
-                                      {g.weightKg != null && <span className="text-gray-600"> ┬╖ {g.weightKg} kg</span>}
+                                      {g.heightCm != null && <span className="text-gray-600"> · {g.heightCm} cm</span>}
+                                      {g.weightKg != null && <span className="text-gray-600"> · {g.weightKg} kg</span>}
                                     </p>
                                   </div>
                                   <button type="button" onClick={() => removeGrowth(selectedChild, g.id)} className="text-gray-400 hover:text-red-600 text-sm">Remove</button>
@@ -564,7 +564,7 @@ export function FamilyHealthSection({
                                 <div>
                                   <p className="font-medium text-gray-800">{m.name}</p>
                                   <p className="text-xs text-gray-500">
-                                    {[m.dosage, m.schedule, m.notes].filter(Boolean).join(' ┬╖ ')}
+                                    {[m.dosage, m.schedule, m.notes].filter(Boolean).join(' · ')}
                                   </p>
                                 </div>
                                 <button type="button" onClick={() => removeMedication(selectedChild, m.id)} className="text-gray-400 hover:text-red-600 text-sm">Remove</button>

@@ -115,6 +115,46 @@ Download a PDF health report, find the nearest clinic on the map, look up a spec
 
 ---
 
+## ⌚ Companion App (Apple Watch)
+
+Dr. Maple uses a **native iOS companion app** to link your **Apple Watch** to your account. The companion app runs on your **iPhone** and syncs health and activity data from your Watch into the same Firebase project as the web app, so your dashboard and voice calls can use real vitals.
+
+### What it does
+
+- **Pairing:** On the web (Dashboard → **My Wellness**), you tap **Get pairing code**. A short code (e.g. `ABC123`) is generated and stored in Firestore. You enter that code in the **Dr. Maple Watch app** on your iPhone and tap **Sync**. The app associates your Watch data with your Dr. Maple user ID.
+- **Data synced:** Heart rate, steps, exercise minutes, stand hours, sleep duration and quality, active energy (kcal), breathing rate, and optional noise exposure. Data is written to Firestore at `users/{userId}/appleWatchMetrics/current`.
+- **Where it appears:** The web app subscribes to that document in real time. Your **Dashboard → My Wellness** section shows sleep, heart rate, exercise, and steps (with day/week/month views). During a **voice call**, if the Watch is paired, a **Live Vitals** overlay shows the same metrics so Dr. Maple can factor them into triage.
+
+### What it uses
+
+| Component | Technology |
+|-----------|------------|
+| Platform | iOS (iPhone app; reads data from paired Apple Watch) |
+| Health data | **HealthKit** — steps, heart rate, sleep, workouts, activity rings |
+| Backend | **Firebase** (same project as the web app) — Firestore for pairing codes and metrics |
+| Pairing | Web creates a code in `pairingCodes/{code}` with `userId`; iOS app reads the code, then writes to `users/{userId}/appleWatchMetrics/current` |
+
+### Repository
+
+The companion app is a **separate repository** (different toolchain: Xcode, Swift, HealthKit). Keeping it in its own repo is standard — many projects link to a dedicated iOS/Android app so the web repo stays focused and the mobile app can be built and released independently.
+
+| Option | Use case |
+|--------|----------|
+| **Separate repo (recommended)** | Push the companion to its own GitHub repo and link it below. One clone per project; clear separation. |
+| **Git submodule** | To have both in one clone: `git submodule add <companion-repo-url> ios-companion` then `git submodule update --init --recursive`. |
+
+**Companion app repository:** [**Dr. Maple Companion**](https://github.com/Miguel6680/dr-maple-companion-app) — clone it, open `DrMapleCompanion.xcodeproj` in Xcode, and configure the same Firebase project (add `GoogleService-Info.plist` from Firebase Console). The maple leaf app icon assets are in **this** repo under [`ios-app-icon/`](ios-app-icon/).
+
+*If your companion repo lives elsewhere, replace the link above with your actual URL.*
+
+The companion app must use the **same Firebase project** as the web app so that pairing codes and `appleWatchMetrics` live in the same Firestore database. Firestore rules must allow read/write on `pairingCodes` and `users/{userId}/appleWatchMetrics` (test mode or your auth rules).
+
+### Disconnecting
+
+On the web, **My Wellness** → **Disconnect** clears `users/{userId}/appleWatchMetrics/current`, so the dashboard and call no longer show Watch data until you pair again with a new code.
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Clone & install dependencies
