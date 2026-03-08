@@ -4,6 +4,7 @@ import { useHealthHistory } from '../hooks/useHealthHistory';
 import { TRIAGE_LEVELS } from '../constants';
 import type { TriageLevel } from '../constants';
 import { ClinicMap } from '../components/ClinicMap';
+import { WatchCompanionStats } from '../components/WatchCompanionStats';
 import { useState, useRef } from 'react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
@@ -112,6 +113,9 @@ export const Dashboard = () => {
             <button onClick={() => setActiveTab('map')} className="btn-ghost px-6 py-3 text-rose-600">
               Find a Clinic
             </button>
+            <button onClick={() => setActiveTab('watch')} className="btn-ghost px-6 py-3 text-rose-600">
+              Watch Companion
+            </button>
           </div>
         </div>
         <div className="hidden md:block relative">
@@ -130,6 +134,7 @@ export const Dashboard = () => {
           {([
             { id: 'history', label: 'Health History' },
             { id: 'map',     label: 'Find a Clinic'  },
+            { id: 'watch',   label: 'Watch Companion' },
           ] as { id: DashTab; label: string }[]).map(tab => (
             <button
               key={tab.id}
@@ -149,44 +154,23 @@ export const Dashboard = () => {
       {/* ── Content ─────────────────────────────────────────────────────────── */}
       <div className={`flex-1 max-w-7xl mx-auto w-full ${activeTab === 'map' ? '' : 'px-8 md:px-16 py-6'}`}>
 
-        {activeTab === 'history' && (
-          <>
-            {/* Apple Watch companion card */}
-            <div className="card mb-6 border border-rose-100">
-              <div className="flex items-start justify-between gap-3">
+        {activeTab === 'watch' && (
+          <div className="space-y-8">
+            {/* Pairing card — Watch Companion area */}
+            <div className="card border border-rose-100">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center text-lg flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-xl flex-shrink-0">
                     ⌚️
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Dr. Maple Watch Companion</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Connect your Apple Watch to share heart rate, sleep, and activity data with Dr. Maple.
+                    <h2 className="text-lg font-semibold text-gray-800">Link your Apple Watch</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Connect your watch to share heart rate, sleep, and activity with Dr. Maple. Get a code below, enter it in the Dr. Maple Watch app on your iPhone, then tap Sync.
                     </p>
-                    {watchMetrics && (
-                      <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-gray-600">
-                        {typeof watchMetrics.avgHeartRate === 'number' && (
-                          <p>❤️ Avg HR (24h): <span className="font-semibold text-gray-800">{Math.round(watchMetrics.avgHeartRate)} bpm</span></p>
-                        )}
-                        {typeof watchMetrics.stepsToday === 'number' && (
-                          <p>🚶 Steps today: <span className="font-semibold text-gray-800">{watchMetrics.stepsToday}</span></p>
-                        )}
-                        {typeof watchMetrics.exerciseMinutes === 'number' && (
-                          <p>🏃 Exercise: <span className="font-semibold text-gray-800">{watchMetrics.exerciseMinutes} min</span></p>
-                        )}
-                        {typeof watchMetrics.sleepDurationHours === 'number' && (
-                          <p>😴 Sleep last night: <span className="font-semibold text-gray-800">{watchMetrics.sleepDurationHours.toFixed(1)} h</span></p>
-                        )}
-                      </div>
-                    )}
-                    {!watchMetrics && !watchLoading && (
-                      <p className="text-xs text-gray-400 mt-2">
-                        After pairing, open the Dr. Maple Watch app on your iPhone and tap &quot;Sync&quot; to send data here.
-                      </p>
-                    )}
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                <div className="flex flex-col items-stretch sm:items-end gap-2 flex-shrink-0">
                   {pairingError && (
                     <div className="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-left max-w-xs">
                       <p className="text-xs text-red-500">{pairingError}</p>
@@ -194,20 +178,20 @@ export const Dashboard = () => {
                   )}
                   <button
                     onClick={handleGeneratePairingCode}
-                    className="btn-primary px-3 py-1.5 text-xs disabled:opacity-60 disabled:cursor-wait"
+                    className="btn-primary px-4 py-2 text-sm disabled:opacity-60 disabled:cursor-wait"
                     disabled={isGeneratingCode}
                   >
                     {isGeneratingCode ? 'Generating…' : 'Get Pairing Code'}
                   </button>
                   {pairingCode && (
-                    <div className="mt-1 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">Pairing code — enter in all caps on phone</p>
-                      <div className="flex items-center justify-between gap-2 mt-1">
-                        <p className="font-mono text-lg text-rose-600 tracking-[0.25em]">{pairingCode}</p>
+                    <div className="px-4 py-3 rounded-xl bg-rose-50 border border-rose-200">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">Enter in Watch app (all caps)</p>
+                      <div className="flex items-center justify-between gap-3 mt-1">
+                        <span className="font-mono text-xl text-rose-600 tracking-[0.2em]">{pairingCode}</span>
                         <button
                           type="button"
                           onClick={() => navigator.clipboard.writeText(pairingCode)}
-                          className="text-xs text-rose-400 hover:text-rose-600 whitespace-nowrap"
+                          className="text-sm text-rose-500 hover:text-rose-600 whitespace-nowrap"
                         >
                           Copy
                         </button>
@@ -218,6 +202,16 @@ export const Dashboard = () => {
               </div>
             </div>
 
+            {/* Health stats from watch */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-800 mb-4">Your health stats</h3>
+              <WatchCompanionStats metrics={watchMetrics} isLoading={watchLoading} />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <>
             {/* Session history */}
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
