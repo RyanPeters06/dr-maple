@@ -39,9 +39,15 @@ export const ClinicMap = () => {
   // Search clinics once map is loaded and location is known
   useEffect(() => {
     if (!isLoaded || isLocating) return;
-    searchNearbyClinics(userLocation, (results) => {
-      setClinics(results);
-    });
+    searchNearbyClinics(
+      userLocation,
+      (results) => setClinics(results),
+      (placeId, website) => {
+        setClinics(prev =>
+          prev.map(c => c.id === placeId ? { ...c, website } : c)
+        );
+      }
+    );
   }, [isLoaded, isLocating, userLocation]);
 
   const onMapLoad = useCallback((map: google.maps.Map) => {
@@ -69,7 +75,7 @@ export const ClinicMap = () => {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-gray-500 text-sm">Loading map...</p>
         </div>
       </div>
@@ -142,11 +148,11 @@ export const ClinicMap = () => {
                     <p className="text-xs text-gray-500">{selectedClinic.address}</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1 mb-2">
                   <span className={`text-xs px-2 py-0.5 rounded-full ${selectedClinic.isOpen ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                     {selectedClinic.isOpen ? 'Open Now' : 'Closed'}
                   </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
                     ⏱ {selectedClinic.waitTime}
                   </span>
                   {selectedClinic.rating && (
@@ -155,6 +161,14 @@ export const ClinicMap = () => {
                     </span>
                   )}
                 </div>
+                <a
+                  href={selectedClinic.website ?? selectedClinic.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-medium text-rose-600 hover:text-rose-800 underline"
+                >
+                  {selectedClinic.website ? 'Visit website & book →' : 'View on Google Maps →'}
+                </a>
               </div>
             </InfoWindow>
           )}
@@ -162,7 +176,7 @@ export const ClinicMap = () => {
       </div>
 
       {/* Clinic list */}
-      <div className="h-52 overflow-y-auto bg-white border-t border-rose-100 flex-shrink-0">
+      <div className="h-64 overflow-y-auto bg-white border-t border-rose-100 flex-shrink-0">
         {clinics.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-gray-400 text-sm">
@@ -172,24 +186,39 @@ export const ClinicMap = () => {
         ) : (
           <div className="divide-y divide-rose-50">
             {clinics.map((clinic) => (
-              <button
+              <div
                 key={clinic.id}
-                onClick={() => handleClinicClick(clinic)}
-                className={`w-full text-left px-4 py-3 hover:bg-rose-50 transition-colors flex items-center justify-between gap-3 ${
+                className={`px-4 py-3 flex items-center justify-between gap-3 hover:bg-rose-50 transition-colors ${
                   selectedClinic?.id === clinic.id ? 'bg-rose-50' : ''
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
+                {/* Left: name + address — clicking selects on map */}
+                <button
+                  onClick={() => handleClinicClick(clinic)}
+                  className="flex items-center gap-3 min-w-0 text-left flex-1"
+                >
                   <span className="text-lg flex-shrink-0">🏥</span>
                   <div className="min-w-0">
                     <p className="font-medium text-sm text-gray-800 truncate">{clinic.name}</p>
                     <p className="text-xs text-gray-400 truncate">{clinic.address}</p>
                   </div>
-                </div>
-                <div className="flex-shrink-0">
+                </button>
+
+                {/* Right: wait badge + book link */}
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <WaitTimeBadge waitTime={clinic.waitTime} isOpen={clinic.isOpen} size="sm" />
+                  <a
+                    href={clinic.website ?? clinic.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    title={clinic.website ?? 'View on Google Maps'}
+                    className="text-xs font-medium text-rose-600 hover:text-rose-800 border border-rose-200 hover:border-rose-400 bg-white hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    {clinic.website ? 'Book →' : 'Maps →'}
+                  </a>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
