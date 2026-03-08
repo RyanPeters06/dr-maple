@@ -32,7 +32,20 @@ Canadians are left making a difficult, stressful choice every time they feel unw
 > *Talk to Dr. Maple. Describe how you feel. Get a clear answer in under 2 minutes.*
 
 <div align="center">
-  <img src="public/mascot-wave.png" alt="Dr. Maple mascot" height="180" />
+  <img src="screenshots/landing-page.png" alt="Dr. Maple landing page" width="100%" />
+  <br/><br/>
+  <img src="screenshots/active-call.png" alt="Active call with Dr. Maple" width="100%" />
+  <br/><br/>
+  <table>
+    <tr>
+      <td><img src="screenshots/health-history.png" alt="Health History" width="100%" /></td>
+      <td><img src="screenshots/clinic-finder.png" alt="Clinic Finder" width="100%" /></td>
+    </tr>
+    <tr>
+      <td><img src="screenshots/apple-watch-heart.png" alt="Apple Watch heart rate" width="100%" /></td>
+      <td><img src="screenshots/apple-watch-stats.png" alt="Apple Watch stats" width="100%" /></td>
+    </tr>
+  </table>
 </div>
 
 ---
