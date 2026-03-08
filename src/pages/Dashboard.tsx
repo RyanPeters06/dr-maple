@@ -9,16 +9,16 @@ import { useState, useRef, useEffect } from 'react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useUserProfile } from '../hooks/useUserProfile';
-import { createPairingCode, clearAppleWatchMetrics } from '../services/firebase';
+import { createPairingCode, clearAppleWatchMetrics, getSymptomLog, saveSymptomLog, type SymptomEntry as FirebaseSymptomEntry } from '../services/firebase';
 
 type DashSection = 'home' | 'history' | 'map' | 'watch' | 'specialists' | 'screening';
 type WatchBlockDetail = 'sleep' | 'heartRate' | 'exercise' | 'steps' | null;
 
-type SymptomEntry = { id: string; date: string; symptom: string; note: string };
+type SymptomEntry = FirebaseSymptomEntry;
 
 const SYMPTOMS_STORAGE_KEY = (userId: string) => `dr-maple-symptoms-${userId}`;
 
-function loadSymptomLog(userId: string | undefined): SymptomEntry[] {
+function loadSymptomLogLocal(userId: string | undefined): SymptomEntry[] {
   if (!userId) return [];
   try {
     const raw = localStorage.getItem(SYMPTOMS_STORAGE_KEY(userId));
@@ -30,13 +30,11 @@ function loadSymptomLog(userId: string | undefined): SymptomEntry[] {
   }
 }
 
-function saveSymptomLog(userId: string | undefined, entries: SymptomEntry[]) {
+function saveSymptomLogLocal(userId: string | undefined, entries: SymptomEntry[]) {
   if (!userId) return;
   try {
     localStorage.setItem(SYMPTOMS_STORAGE_KEY(userId), JSON.stringify(entries));
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
 }
 
 function ageFromDateOfBirth(dateOfBirth: string | null | undefined): number | null {
@@ -52,7 +50,7 @@ function ageFromDateOfBirth(dateOfBirth: string | null | undefined): number | nu
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth0();
-  const { sessions, isLoading, error, refresh } = useHealthHistory();
+  const { sessions, isLoading, error, refresh, deleteSession } = useHealthHistory();
   const [activeSection, setActiveSection] = useState<DashSection>('home');
   const mainRef = useRef<HTMLDivElement>(null);
   useScrollReveal(mainRef);
@@ -67,18 +65,31 @@ export const Dashboard = () => {
   const [heartRatePeriod, setHeartRatePeriod] = useState<'day' | 'week' | 'month'>('day');
   const [exercisePeriod, setExercisePeriod] = useState<'day' | 'week' | 'month'>('day');
   const [stepsPeriod, setStepsPeriod] = useState<'daily' | 'bestMonth'>('daily');
-  const [symptomLog, setSymptomLog] = useState<SymptomEntry[]>(() => loadSymptomLog(user?.sub));
+  const [symptomLog, setSymptomLog] = useState<SymptomEntry[]>(() => loadSymptomLogLocal(user?.sub));
   const [symptomInput, setSymptomInput] = useState('');
   const [symptomNote, setSymptomNote] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [specialistProvince, setSpecialistProvince] = useState<string>('ON');
   const [specialistSearch, setSpecialistSearch] = useState('');
 
+  // Load from Firebase on mount, fall back to localStorage
   useEffect(() => {
-    setSymptomLog(loadSymptomLog(user?.sub));
+    if (!user?.sub) return;
+    getSymptomLog(user.sub).then(entries => {
+      if (entries && entries.length > 0) setSymptomLog(entries);
+      else setSymptomLog(loadSymptomLogLocal(user.sub));
+    });
   }, [user?.sub]);
 
+  // Refresh health history whenever user navigates to the history section
   useEffect(() => {
-    saveSymptomLog(user?.sub, symptomLog);
+    if (activeSection === 'history') refresh();
+  }, [activeSection]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist to both localStorage (instant) and Firebase (durable)
+  useEffect(() => {
+    saveSymptomLogLocal(user?.sub, symptomLog);
+    if (user?.sub) saveSymptomLog(user.sub, symptomLog);
   }, [user?.sub, symptomLog]);
 
   const addSymptom = () => {
@@ -173,7 +184,7 @@ export const Dashboard = () => {
           <img
             src="/dr-maple-logo.png"
             alt="Dr. Maple"
-            className="h-20 object-contain cursor-pointer"
+            className="h-[7.5rem] object-contain cursor-pointer"
             onClick={() => navigate('/')}
           />
         </div>
@@ -353,40 +364,77 @@ export const Dashboard = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   {sessions.map((session, idx) => {
-                    const style = getUrgencyStyle(session.triageResult.urgency);
+                    const style = getUrgencyStyle(session.triageResult?.urgency ?? 'Non-urgent');
+                    const isDeleting = deletingId === session.id;
                     return (
-                      <button
+                      <div
                         key={session.id}
-                        onClick={() => navigate(`/report/${session.id}`)}
-                        className={`fade-in-up delay-${Math.min(idx + 1, 6)} text-left bg-white border border-rose-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-rose-300 transition-all group`}
+                        className={`fade-in-up delay-${Math.min(idx + 1, 6)} relative bg-white border border-rose-100 rounded-2xl shadow-sm hover:shadow-md hover:border-rose-300 transition-all group ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
                       >
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold text-white ${style.bgClass}`}>
-                              {session.triageResult.urgency}
-                            </span>
-                            <span className="text-xs text-gray-400">{formatDate(session.timestamp)}</span>
-                            {session.duration && (
-                              <span className="text-xs text-gray-300">{formatDuration(session.duration)}</span>
-                            )}
+                        {/* Delete button */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!window.confirm('Delete this session from your health history?')) return;
+                            setDeletingId(session.id);
+                            await deleteSession(session.id);
+                            setDeletingId(null);
+                          }}
+                          className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                          title="Delete session"
+                        >
+                          {isDeleting ? (
+                            <span className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin block" />
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                              <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+
+                        {/* Card body — click to open report */}
+                        <button
+                          onClick={() => navigate(`/report/${session.id}`)}
+                          className="w-full text-left p-6"
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-3 pr-6">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {session.triageResult ? (
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold text-white ${style.bgClass}`}>
+                                  {session.triageResult.urgency}
+                                </span>
+                              ) : (
+                                <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-gray-100 text-gray-500">
+                                  Transcript only
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-400">{formatDate(session.timestamp)}</span>
+                              {session.duration && (
+                                <span className="text-xs text-gray-300">{formatDuration(session.duration)}</span>
+                              )}
+                            </div>
+                            <span className="text-gray-300 group-hover:text-rose-400 transition-colors text-sm flex-shrink-0">→</span>
                           </div>
-                          <span className="text-gray-300 group-hover:text-rose-400 transition-colors text-sm flex-shrink-0">→</span>
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">{session.triageResult.action}</p>
-                        <p className="text-xs text-gray-400 line-clamp-2 mb-3">{session.triageResult.summary}</p>
-                        {session.triageResult.symptoms.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {session.triageResult.symptoms.slice(0, 3).map((s, i) => (
-                              <span key={i} className="text-xs bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-full">
-                                {s}
-                              </span>
-                            ))}
-                            {session.triageResult.symptoms.length > 3 && (
-                              <span className="text-xs text-gray-400">+{session.triageResult.symptoms.length - 3} more</span>
-                            )}
-                          </div>
-                        )}
-                      </button>
+                          <p className="font-semibold text-gray-800 text-sm mb-1">
+                            {session.triageResult?.action ?? 'Consultation recorded'}
+                          </p>
+                          <p className="text-xs text-gray-400 line-clamp-2 mb-3">
+                            {session.triageResult?.summary ?? `${session.transcript?.length ?? 0} messages — no triage result generated`}
+                          </p>
+                          {session.triageResult?.symptoms && session.triageResult.symptoms.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {session.triageResult.symptoms.slice(0, 3).map((s, i) => (
+                                <span key={i} className="text-xs bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-full">
+                                  {s}
+                                </span>
+                              ))}
+                              {session.triageResult.symptoms.length > 3 && (
+                                <span className="text-xs text-gray-400">+{session.triageResult.symptoms.length - 3} more</span>
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>

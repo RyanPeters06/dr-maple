@@ -44,7 +44,7 @@ export interface SessionRecord {
   id: string;
   userId: string;
   timestamp: string;
-  triageResult: TriageResult;
+  triageResult?: TriageResult;
   transcript: Pick<TranscriptMessage, 'role' | 'text'>[];
   duration?: number;
 }
@@ -65,7 +65,7 @@ export interface AppleWatchMetrics {
 export const saveSession = async (
   userId: string,
   data: {
-    triageResult: TriageResult;
+    triageResult?: TriageResult;
     transcript: Pick<TranscriptMessage, 'role' | 'text'>[];
     duration?: number;
   }
@@ -116,6 +116,18 @@ export const getUserSessions = async (userId: string): Promise<SessionRecord[]> 
   } catch (err) {
     console.error('Failed to load sessions:', err);
     return [];
+  }
+};
+
+export const deleteSession = async (sessionId: string): Promise<boolean> => {
+  const firestore = getDb();
+  if (!firestore) return false;
+  try {
+    await deleteDoc(doc(firestore, 'sessions', sessionId));
+    return true;
+  } catch (err) {
+    console.error('Failed to delete session:', err);
+    return false;
   }
 };
 
@@ -299,4 +311,41 @@ export const saveUserProfile = async (userId: string, profile: UserProfile): Pro
     updatedAt: Timestamp.now(),
   }, { merge: true });
   return true;
+};
+
+// ─── Symptom log (personal symptom diary, persisted per user) ────────────────
+
+export interface SymptomEntry {
+  id: string;
+  date: string;
+  symptom: string;
+  note: string;
+}
+
+const SYMPTOM_LOG_COLLECTION = 'symptomLogs';
+
+export const getSymptomLog = async (userId: string): Promise<SymptomEntry[] | null> => {
+  const firestore = getDb();
+  if (!firestore) return null;
+  try {
+    const ref = doc(firestore, SYMPTOM_LOG_COLLECTION, userId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return Array.isArray(data.entries) ? data.entries : [];
+  } catch (err) {
+    console.error('Failed to load symptom log:', err);
+    return null;
+  }
+};
+
+export const saveSymptomLog = async (userId: string, entries: SymptomEntry[]): Promise<void> => {
+  const firestore = getDb();
+  if (!firestore) return;
+  try {
+    const ref = doc(firestore, SYMPTOM_LOG_COLLECTION, userId);
+    await setDoc(ref, { entries, updatedAt: Timestamp.now() });
+  } catch (err) {
+    console.error('Failed to save symptom log:', err);
+  }
 };

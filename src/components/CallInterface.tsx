@@ -8,9 +8,11 @@ import { useElevenLabs } from '../hooks/useElevenLabs';
 import { usePresage } from '../hooks/usePresage';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useRecorder } from '../hooks/useRecorder';
-import { saveSession } from '../services/firebase';
+import { useUserProfile } from '../hooks/useUserProfile';
+import { saveSession, getSymptomLog } from '../services/firebase';
 import { downloadTranscriptPdf } from '../services/report';
 import type { TriageResult } from '../constants';
+import type { WellnessContext } from '../services/gemini';
 
 type CallState = 'idle' | 'starting' | 'active' | 'ended';
 
@@ -23,16 +25,32 @@ export const CallInterface = () => {
 
   const [callState, setCallState] = useState<CallState>('idle');
   const [isListening, setIsListening] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
   const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState(0);
   const durationRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const callDurationRef = useRef(0);
 
-  const { transcript, isThinking, triageResult, error: geminiError, initChat, startCall, sendPatientMessage } = useGemini();
+  const {
+    transcript, isThinking, triageResult, error: geminiError,
+    choices, photoRequested,
+    initChat, startCall, sendPatientMessage, sendPhotoMessage, dismissPhotoRequest,
+  } = useGemini();
+
+  // Keep refs in sync so handleEndCall always reads the latest values
+  const latestTranscriptRef = useRef(transcript);
+  const latestTriageResultRef = useRef(triageResult);
+  useEffect(() => { latestTranscriptRef.current = transcript; }, [transcript]);
+  useEffect(() => { latestTriageResultRef.current = triageResult; }, [triageResult]);
+  useEffect(() => { callDurationRef.current = callDuration; }, [callDuration]);
   const { speak, stop: stopSpeaking, isSpeaking, ttsError } = useElevenLabs();
-  const { vitals, isReady: presageReady } = usePresage(videoRef);
+  const { vitals } = usePresage(videoRef);
   const { metrics: watchMetrics } = useAppleWatchMetrics();
   const { startRecording, stopRecording, downloadRecording } = useRecorder();
+  const { profile } = useUserProfile(user?.sub);
 
   useEffect(() => {
     if (transcriptRef.current) transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
@@ -71,6 +89,36 @@ export const CallInterface = () => {
     if (videoRef.current) videoRef.current.srcObject = null;
   };
 
+  const buildWellnessContext = useCallback(async (): Promise<WellnessContext | null> => {
+    if (!user?.sub) return null;
+    try {
+      const symptoms = await getSymptomLog(user.sub);
+      const ctx: WellnessContext = {};
+      if (profile) {
+        if (profile.dateOfBirth) {
+          const age = new Date().getFullYear() - new Date(profile.dateOfBirth).getFullYear();
+          ctx.profileAge = age;
+        }
+        if (profile.sex) ctx.profileSex = profile.sex;
+        if (profile.heightCm) ctx.profileHeightCm = profile.heightCm;
+        if (profile.weightKg) ctx.profileWeightKg = profile.weightKg;
+        if (profile.allergies?.length) ctx.allergies = profile.allergies;
+        if (profile.currentMedications?.length) ctx.medications = profile.currentMedications;
+        if (profile.pastMedicalProblems?.length) ctx.medicalHistory = profile.pastMedicalProblems;
+      }
+      if (symptoms && symptoms.length > 0) {
+        ctx.recentSymptoms = symptoms.slice(0, 8).map(s => ({
+          date: s.date,
+          symptom: s.symptom,
+          note: s.note || undefined,
+        }));
+      }
+      return ctx;
+    } catch {
+      return null;
+    }
+  }, [user?.sub, profile]);
+
   const handleStartCall = async () => {
     setCallState('starting');
     initChat();
@@ -79,7 +127,8 @@ export const CallInterface = () => {
     startRecording();
     setCallState('active');
     try {
-      const greeting = await startCall(vitals, watchMetrics ?? null);
+      const wellnessCtx = await buildWellnessContext();
+      const greeting = await startCall(vitals, watchMetrics ?? null, wellnessCtx);
       if (greeting) await speak(greeting, vitals.stressLevel);
     } catch (err) {
       console.error('Call start error:', err);
@@ -91,17 +140,31 @@ export const CallInterface = () => {
     setCallState('ended');
     stopCamera();
     const blob = stopRecording();
-    if (user && triageResult) {
+
+    // Read from refs so we always get the latest values regardless of render timing
+    const currentDuration = callDurationRef.current;
+    const currentTranscript = latestTranscriptRef.current;
+    const currentTriageResult = latestTriageResultRef.current;
+
+    if (blob && currentDuration > 10) setRecordingBlob(blob);
+
+    // Save every call where the call actually started (duration > 3s),
+    // even if no triage result was produced
+    if (user && currentDuration > 3) {
+      setIsSavingSession(true);
       try {
         const id = await saveSession(user.sub!, {
-          triageResult,
-          transcript: transcript.map(m => ({ role: m.role, text: m.text })),
-          duration: callDuration,
+          triageResult: currentTriageResult ?? undefined,
+          transcript: currentTranscript.map(m => ({ role: m.role, text: m.text })),
+          duration: currentDuration,
         });
         if (id) setSavedSessionId(id);
-      } catch { /* non-fatal */ }
+      } catch (err) {
+        console.error('Failed to save session:', err);
+      } finally {
+        setIsSavingSession(false);
+      }
     }
-    if (blob && callDuration > 30) downloadRecording(blob);
   };
 
   const startListening = useCallback(() => {
@@ -126,6 +189,37 @@ export const CallInterface = () => {
     recognition.onend   = () => setIsListening(false);
     recognition.start();
   }, [isSpeaking, isListening, callState, vitals, watchMetrics, sendPatientMessage, speak]);
+
+  const handleChoiceSelect = useCallback(async (choice: string) => {
+    if (isSpeaking || isThinking) return;
+    try {
+      const reply = await sendPatientMessage(choice, vitals, watchMetrics ?? null);
+      if (reply) await speak(reply, vitals.stressLevel);
+    } catch (err) {
+      console.error('Choice selection error:', err);
+    }
+  }, [isSpeaking, isThinking, vitals, watchMetrics, sendPatientMessage, speak]);
+
+  const handleCapturePhoto = useCallback(async () => {
+    if (!videoRef.current || isCapturing) return;
+    setIsCapturing(true);
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context unavailable');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      const reply = await sendPhotoMessage(base64, 'image/jpeg', vitals, watchMetrics ?? null);
+      if (reply) await speak(reply, vitals.stressLevel);
+    } catch (err) {
+      console.error('Photo capture error:', err);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [isCapturing, vitals, watchMetrics, sendPhotoMessage, speak]);
 
   const getUrgencyStyle = (urgency: TriageResult['urgency']) => ({
     Emergency:    'bg-red-600 text-white',
@@ -201,10 +295,22 @@ export const CallInterface = () => {
                 Find Nearby Clinics
               </button>
             )}
-            <button onClick={() => navigate('/dashboard')} className="btn-ghost w-full text-center">
-              Go to My Dashboard
+            <button
+              onClick={() => !isSavingSession && navigate('/dashboard')}
+              disabled={isSavingSession}
+              className={`btn-ghost w-full text-center ${isSavingSession ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isSavingSession ? 'Saving session...' : 'Go to My Dashboard'}
             </button>
-            <button onClick={() => { setCallState('idle'); setSavedSessionId(null); }} className="text-gray-400 hover:text-rose-500 text-sm text-center transition-colors">
+            {recordingBlob && (
+              <button
+                onClick={() => downloadRecording(recordingBlob)}
+                className="btn-ghost w-full text-center"
+              >
+                Download Call Recording
+              </button>
+            )}
+            <button onClick={() => { setCallState('idle'); setSavedSessionId(null); setRecordingBlob(null); }} className="text-gray-400 hover:text-rose-500 text-sm text-center transition-colors">
               Start Another Call
             </button>
           </div>
@@ -213,13 +319,15 @@ export const CallInterface = () => {
     );
   }
 
+  const isBusy = isSpeaking || isListening || isThinking || isCapturing;
+
   // ── Call screen ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-rose-50 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-rose-100 shadow-sm">
         <div className="flex items-center gap-2">
-          <img src="/dr-maple-logo.png" alt="Dr. Maple" className="h-20 object-contain" />
+          <img src="/dr-maple-logo.png" alt="Dr. Maple" className="h-[7.5rem] object-contain" />
           {callState === 'active' && (
             <span className="flex items-center gap-1.5 ml-2">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -237,12 +345,12 @@ export const CallInterface = () => {
       {/* Main call area */}
       <div className="flex-1 relative flex items-center justify-center min-h-0 bg-gradient-to-b from-white to-rose-50">
         <div className="z-10">
-          <DoctorAvatar isSpeaking={isSpeaking} isListening={isListening} isThinking={isThinking} />
+          <DoctorAvatar isSpeaking={isSpeaking} isListening={isListening} isThinking={isThinking || isCapturing} />
         </div>
 
         {/* Patient PiP */}
         <div className="absolute bottom-4 right-4 z-20">
-          <div className="w-36 h-28 rounded-2xl overflow-hidden border-2 border-rose-200 bg-rose-100 shadow-lg">
+          <div className="w-[14.6rem] h-[11.4rem] rounded-2xl overflow-hidden border-2 border-rose-200 bg-rose-100 shadow-lg">
             <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
             {!streamRef.current && (
               <div className="absolute inset-0 flex items-center justify-center bg-rose-50">
@@ -258,10 +366,10 @@ export const CallInterface = () => {
           <p className="text-xs text-gray-400 text-center mt-1">You</p>
         </div>
 
-        {/* Vitals overlay */}
-        {callState === 'active' && (
+        {/* Vitals overlay — only shown when Apple Watch is connected */}
+        {callState === 'active' && watchMetrics !== null && (
           <div className="absolute top-4 left-4 z-20">
-            <LiveVitals vitals={vitals} presageReady={presageReady} watchMetrics={watchMetrics} />
+            <LiveVitals watchMetrics={watchMetrics} />
           </div>
         )}
 
@@ -281,22 +389,24 @@ export const CallInterface = () => {
           </div>
         )}
 
-        {/* Thinking indicator */}
-        {isThinking && (
+        {/* Thinking / analyzing indicator */}
+        {(isThinking || isCapturing) && (
           <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-rose-100 shadow-sm">
             <div className="flex gap-1">
               {[0,1,2].map(i => (
                 <div key={i} className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
               ))}
             </div>
-            <span className="text-xs text-gray-400">Dr. Maple is thinking...</span>
+            <span className="text-xs text-gray-400">
+              {isCapturing ? 'Analyzing photo...' : 'Dr. Maple is thinking...'}
+            </span>
           </div>
         )}
       </div>
 
       {/* Transcript */}
       {callState === 'active' && transcript.length > 0 && (
-        <div ref={transcriptRef} className="h-48 overflow-y-auto px-4 py-3 bg-white border-t border-rose-100 space-y-2">
+        <div ref={transcriptRef} className="h-36 overflow-y-auto px-4 py-3 bg-white border-t border-rose-100 space-y-2">
           {transcript.map((msg, i) => (
             <div key={i} className={`flex gap-2 ${msg.role === 'doctor' ? '' : 'flex-row-reverse'}`}>
               <span className="text-base flex-shrink-0 mt-0.5">{msg.role === 'doctor' ? '🩺' : '🧑'}</span>
@@ -313,13 +423,70 @@ export const CallInterface = () => {
       )}
 
       {/* Controls */}
-      <div className="p-5 bg-white border-t border-rose-100">
+      <div className="p-4 bg-white border-t border-rose-100 space-y-3">
+
+        {/* Choice buttons */}
+        {callState === 'active' && choices && choices.length > 0 && (
+          <div className="flex flex-wrap gap-2 justify-center">
+            {choices.map((choice, i) => (
+              <button
+                key={i}
+                onClick={() => handleChoiceSelect(choice)}
+                disabled={isBusy}
+                className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                  isBusy
+                    ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                    : 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 active:scale-95'
+                }`}
+              >
+                {choice}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Photo request banner */}
+        {callState === 'active' && photoRequested && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-amber-800 font-medium text-center mb-2">
+              Dr. Maple would like to see the area — can you show the camera?
+            </p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={handleCapturePhoto}
+                disabled={isBusy}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
+                  isBusy
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-amber-500 text-white hover:bg-amber-400 active:scale-95 shadow-sm'
+                }`}
+              >
+                {isCapturing ? 'Analyzing...' : 'Show Dr. Maple'}
+              </button>
+              <button
+                onClick={dismissPhotoRequest}
+                disabled={isBusy}
+                className="px-5 py-2 rounded-full text-sm font-medium text-gray-500 border border-gray-200 hover:bg-gray-50 active:scale-95 transition-all"
+              >
+                No thanks
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Main call controls */}
         {callState === 'idle' && (
           <div className="flex flex-col items-center gap-3">
             <button onClick={handleStartCall} className="btn-primary flex items-center gap-3 text-base px-10 py-4">
               <span className="text-xl">📞</span> Start Call with Dr. Maple
             </button>
             <p className="text-xs text-gray-400">Camera + microphone required · Your session is private</p>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="text-sm text-gray-400 hover:text-rose-500 transition-colors mt-1"
+            >
+              ← Back to Dashboard
+            </button>
           </div>
         )}
 
@@ -336,11 +503,11 @@ export const CallInterface = () => {
               {isListening && <div className="absolute inset-0 rounded-full bg-red-400/30 listen-ring" />}
               <button
                 onClick={startListening}
-                disabled={isSpeaking || isListening || isThinking}
+                disabled={isBusy}
                 className={`relative w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-200 ${
                   isListening
                     ? 'bg-red-500 scale-110 shadow-lg shadow-red-300'
-                    : isSpeaking || isThinking
+                    : isBusy
                     ? 'bg-gray-200 opacity-50 cursor-not-allowed'
                     : 'bg-rose-600 hover:bg-rose-500 active:scale-95 shadow-lg shadow-rose-300'
                 }`}
@@ -350,7 +517,7 @@ export const CallInterface = () => {
             </div>
 
             <p className="text-sm text-gray-400 w-24 text-center">
-              {isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : isThinking ? 'Thinking...' : 'Tap to speak'}
+              {isListening ? 'Listening...' : isCapturing ? 'Analyzing...' : isSpeaking ? 'Speaking...' : isThinking ? 'Thinking...' : 'Tap to speak'}
             </p>
 
             <button
