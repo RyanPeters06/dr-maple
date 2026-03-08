@@ -67,19 +67,8 @@ export const useGemini = () => {
     setIsThinking(true);
     setError(null);
 
-    const appleWatchConnected = appleWatch != null && (
-      appleWatch.avgHeartRate != null ||
-      appleWatch.stepsToday != null ||
-      appleWatch.exerciseMinutes != null ||
-      appleWatch.sleepDurationHours != null
-    );
-
-    const choices = appleWatchConnected
-      ? `CHOICES:["General Guidance","Vital Check-In","Non-Emergency Diagnosis","Wellness Review"]`
-      : `CHOICES:["General Guidance","Vital Check-In","Non-Emergency Diagnosis"]`;
-
-    const wellnessSuffix = (wellness && appleWatchConnected) ? buildWellnessSuffix(wellness) : '';
-    const greetingMessage = `The patient has just joined the video call. Please warmly greet them as Dr. Maple and present the consultation mode options using exactly this marker:\n${choices}${wellnessSuffix}`;
+    const wellnessSuffix = wellness ? buildWellnessSuffix(wellness) : '';
+    const greetingMessage = `The patient has just joined the video call. Please warmly greet them as Dr. Maple and present the consultation mode options.${wellnessSuffix}`;
 
     for (let i = modelIndexRef.current; i < MODEL_PRIORITY.length; i++) {
       try {

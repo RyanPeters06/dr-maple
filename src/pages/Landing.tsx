@@ -121,7 +121,7 @@ export const Landing = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { img: '/mascot-phone.png',  title: 'Voice Conversation', desc: 'Talk naturally about your symptoms', delay: 'delay-1' },
-            { img: '/mascot-heart.png',  title: 'Camera Vitals',       desc: 'Real-time heart rate and stress from your webcam', delay: 'delay-2' },
+            { img: '/mascot-heart.png',  title: 'Apple Watch Sync',   desc: 'Heart rate, sleep, steps & activity sent to Dr. Maple', delay: 'delay-2' },
             { img: '/mascot-report.png', title: 'AI Triage',           desc: 'Clear recommendation — ER, clinic, or home', delay: 'delay-3' },
             { img: '/mascot-map.png',    title: 'Clinic Finder',       desc: 'Nearby ERs and walk-ins with wait times', delay: 'delay-4' },
           ].map((f) => (
@@ -145,7 +145,7 @@ export const Landing = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { step: '01', title: 'Describe Your Symptoms', desc: 'Talk to Dr. Maple naturally by voice. No forms, no typing — just a conversation.', delay: 'delay-1' },
-              { step: '02', title: 'Vitals Captured Live',   desc: 'Your webcam passively monitors heart rate, breathing rate, and stress level in real time.', delay: 'delay-3' },
+              { step: '02', title: 'Share Your Health Context', desc: 'Sync your Apple Watch for heart rate, sleep, and activity data — or add your health profile for a more personalized assessment.', delay: 'delay-3' },
               { step: '03', title: 'Get Your Triage Result', desc: 'Dr. Maple gives you a clear action — plus a downloadable PDF report and nearby clinic options.', delay: 'delay-5' },
             ].map((s) => (
               <div key={s.step} className={`fade-in-up ${s.delay} bg-white rounded-2xl p-6 border border-rose-100 shadow-sm flex flex-col gap-3`}>

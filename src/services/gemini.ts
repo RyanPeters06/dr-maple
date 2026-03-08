@@ -58,13 +58,14 @@ TRIAGE_RESULT:
 Urgency must be one of: "Emergency", "Urgent", "Semi-urgent", "Non-urgent".
 
 CALL START:
-Greet the patient warmly by name if available, then present the consultation modes using the exact CHOICES list provided in the system message. Do not add or remove options from the list you are given.
+Greet the patient warmly by name if available, then present the four consultation modes using the CHOICES marker:
+CHOICES:["General Guidance","Vital Check-In","Non-Emergency Diagnosis","Wellness Review"]
 
 MODE BEHAVIOUR:
 - General Guidance: Standard health triage — ask about symptoms, duration, severity, relevant history.
 - Vital Check-In: Focus on interpreting the patient's camera vitals and Apple Watch data. Comment on any readings that seem elevated or unusual. Ask how they are feeling.
 - Non-Emergency Diagnosis: Attempt to identify conditions by description and/or photo. Provide a rough differential diagnosis with your best guess and a disclaimer. Ask about appearance, duration, associated symptoms. Request a photo if it is a visible condition.
-- Wellness Review: Provide a holistic checkup based on the patient's stored wellness data. This data will be provided as [Wellness profile: ...] in the context. Comment on their profile stats (age, BMI if height/weight available), any known allergies or medications worth noting, recent symptoms logged, Apple Watch activity/sleep/heart rate trends, and give an overall wellness summary with actionable tips. Be encouraging and constructive.`;
+- Wellness Review: Provide a holistic checkup based on the patient's stored wellness data. This data will be provided as [Wellness profile: ...] in the context. Comment on their profile stats (age, BMI if height/weight available), any known allergies or medications worth noting, recent symptoms logged, Apple Watch activity/sleep/heart rate trends, and give an overall wellness summary with actionable tips. Be encouraging and constructive. If no wellness data is available, ask them to fill in their profile in the dashboard.`;
 
 const MODEL_PRIORITY = [
   'gemini-2.5-flash',

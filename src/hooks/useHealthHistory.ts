@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { getUserSessions, deleteSession as firebaseDeleteSession, type SessionRecord } from '../services/firebase';
+import { getUserSessions, type SessionRecord } from '../services/firebase';
 
 export const useHealthHistory = () => {
   const { user, isAuthenticated } = useAuth0();
@@ -27,16 +27,5 @@ export const useHealthHistory = () => {
     loadSessions();
   }, [loadSessions]);
 
-  const deleteSession = useCallback(async (sessionId: string): Promise<boolean> => {
-    // Optimistic update — remove from local state immediately
-    setSessions(prev => prev.filter(s => s.id !== sessionId));
-    const ok = await firebaseDeleteSession(sessionId);
-    if (!ok) {
-      // Rollback on failure by reloading
-      loadSessions();
-    }
-    return ok;
-  }, [loadSessions]);
-
-  return { sessions, isLoading, error, refresh: loadSessions, deleteSession };
+  return { sessions, isLoading, error, refresh: loadSessions };
 };

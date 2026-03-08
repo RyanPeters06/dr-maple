@@ -119,18 +119,6 @@ export const getUserSessions = async (userId: string): Promise<SessionRecord[]> 
   }
 };
 
-export const deleteSession = async (sessionId: string): Promise<boolean> => {
-  const firestore = getDb();
-  if (!firestore) return false;
-  try {
-    await deleteDoc(doc(firestore, 'sessions', sessionId));
-    return true;
-  } catch (err) {
-    console.error('Failed to delete session:', err);
-    return false;
-  }
-};
-
 export const getSession = async (sessionId: string): Promise<SessionRecord | null> => {
   const firestore = getDb();
   if (!firestore) return null;

@@ -32,20 +32,12 @@ export const CallInterface = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState(0);
   const durationRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const callDurationRef = useRef(0);
 
   const {
     transcript, isThinking, triageResult, error: geminiError,
     choices, photoRequested,
     initChat, startCall, sendPatientMessage, sendPhotoMessage, dismissPhotoRequest,
   } = useGemini();
-
-  // Keep refs in sync so handleEndCall always reads the latest values
-  const latestTranscriptRef = useRef(transcript);
-  const latestTriageResultRef = useRef(triageResult);
-  useEffect(() => { latestTranscriptRef.current = transcript; }, [transcript]);
-  useEffect(() => { latestTriageResultRef.current = triageResult; }, [triageResult]);
-  useEffect(() => { callDurationRef.current = callDuration; }, [callDuration]);
   const { speak, stop: stopSpeaking, isSpeaking, ttsError } = useElevenLabs();
   const { vitals } = usePresage(videoRef);
   const { metrics: watchMetrics } = useAppleWatchMetrics();
@@ -140,28 +132,17 @@ export const CallInterface = () => {
     setCallState('ended');
     stopCamera();
     const blob = stopRecording();
-
-    // Read from refs so we always get the latest values regardless of render timing
-    const currentDuration = callDurationRef.current;
-    const currentTranscript = latestTranscriptRef.current;
-    const currentTriageResult = latestTriageResultRef.current;
-
-    if (blob && currentDuration > 10) setRecordingBlob(blob);
-
-    // Save every call where the call actually started (duration > 3s),
-    // even if no triage result was produced
-    if (user && currentDuration > 3) {
+    if (blob && callDuration > 10) setRecordingBlob(blob);
+    if (user && transcript.length > 0) {
       setIsSavingSession(true);
       try {
         const id = await saveSession(user.sub!, {
-          triageResult: currentTriageResult ?? undefined,
-          transcript: currentTranscript.map(m => ({ role: m.role, text: m.text })),
-          duration: currentDuration,
+          triageResult: triageResult ?? undefined,
+          transcript: transcript.map(m => ({ role: m.role, text: m.text })),
+          duration: callDuration,
         });
         if (id) setSavedSessionId(id);
-      } catch (err) {
-        console.error('Failed to save session:', err);
-      } finally {
+      } catch { /* non-fatal */ } finally {
         setIsSavingSession(false);
       }
     }
