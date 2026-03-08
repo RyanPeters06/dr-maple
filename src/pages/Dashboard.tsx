@@ -1,18 +1,43 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useHealthHistory } from '../hooks/useHealthHistory';
-import { TRIAGE_LEVELS } from '../constants';
+import { TRIAGE_LEVELS, PROVINCIAL_DOCTOR_DIRECTORIES } from '../constants';
 import type { TriageLevel } from '../constants';
 import { ClinicMap } from '../components/ClinicMap';
 import { WatchCompanionStats } from '../components/WatchCompanionStats';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useUserProfile } from '../hooks/useUserProfile';
 import { createPairingCode, clearAppleWatchMetrics } from '../services/firebase';
 
-type DashSection = 'history' | 'map' | 'watch';
+type DashSection = 'home' | 'history' | 'map' | 'watch' | 'specialists' | 'screening';
 type WatchBlockDetail = 'sleep' | 'heartRate' | 'exercise' | 'steps' | null;
+
+type SymptomEntry = { id: string; date: string; symptom: string; note: string };
+
+const SYMPTOMS_STORAGE_KEY = (userId: string) => `dr-maple-symptoms-${userId}`;
+
+function loadSymptomLog(userId: string | undefined): SymptomEntry[] {
+  if (!userId) return [];
+  try {
+    const raw = localStorage.getItem(SYMPTOMS_STORAGE_KEY(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSymptomLog(userId: string | undefined, entries: SymptomEntry[]) {
+  if (!userId) return;
+  try {
+    localStorage.setItem(SYMPTOMS_STORAGE_KEY(userId), JSON.stringify(entries));
+  } catch {
+    /* ignore */
+  }
+}
 
 function ageFromDateOfBirth(dateOfBirth: string | null | undefined): number | null {
   if (!dateOfBirth) return null;
@@ -28,7 +53,7 @@ export const Dashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth0();
   const { sessions, isLoading, error, refresh } = useHealthHistory();
-  const [activeSection, setActiveSection] = useState<DashSection>('history');
+  const [activeSection, setActiveSection] = useState<DashSection>('home');
   const mainRef = useRef<HTMLDivElement>(null);
   useScrollReveal(mainRef);
   const { metrics: watchMetrics, isLoading: watchLoading } = useAppleWatchMetrics();
@@ -42,6 +67,34 @@ export const Dashboard = () => {
   const [heartRatePeriod, setHeartRatePeriod] = useState<'day' | 'week' | 'month'>('day');
   const [exercisePeriod, setExercisePeriod] = useState<'day' | 'week' | 'month'>('day');
   const [stepsPeriod, setStepsPeriod] = useState<'daily' | 'bestMonth'>('daily');
+  const [symptomLog, setSymptomLog] = useState<SymptomEntry[]>(() => loadSymptomLog(user?.sub));
+  const [symptomInput, setSymptomInput] = useState('');
+  const [symptomNote, setSymptomNote] = useState('');
+  const [specialistProvince, setSpecialistProvince] = useState<string>('ON');
+  const [specialistSearch, setSpecialistSearch] = useState('');
+
+  useEffect(() => {
+    setSymptomLog(loadSymptomLog(user?.sub));
+  }, [user?.sub]);
+
+  useEffect(() => {
+    saveSymptomLog(user?.sub, symptomLog);
+  }, [user?.sub, symptomLog]);
+
+  const addSymptom = () => {
+    const trimmed = symptomInput.trim();
+    if (!trimmed) return;
+    setSymptomLog(prev => [
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, date: new Date().toISOString().slice(0, 10), symptom: trimmed, note: symptomNote.trim() },
+      ...prev,
+    ]);
+    setSymptomInput('');
+    setSymptomNote('');
+  };
+
+  const removeSymptom = (id: string) => {
+    setSymptomLog(prev => prev.filter(e => e.id !== id));
+  };
 
   const formatDate = (iso: string) => {
     try {
@@ -100,10 +153,14 @@ export const Dashboard = () => {
   const watchPaired = watchMetrics != null;
 
   const navItems: { id: DashSection | 'call'; icon: string; label: string; action: () => void }[] = [
-    { id: 'call',    icon: '📞', label: 'New Call',       action: () => navigate('/call') },
-    { id: 'history', icon: '📋', label: 'Health History', action: () => setActiveSection('history') },
-    { id: 'watch',   icon: '⌚️', label: 'Apple Watch',    action: () => setActiveSection('watch') },
-    { id: 'map',     icon: '🗺️', label: 'Find a Clinic',  action: () => setActiveSection('map') },
+    { id: 'call',        icon: '📞', label: 'New Call',         action: () => navigate('/call') },
+    { id: 'home',        icon: '🏠', label: 'Home',             action: () => setActiveSection('home') },
+    { id: 'history',     icon: '📋', label: 'Health History',   action: () => setActiveSection('history') },
+    { id: 'watch',       icon: '⌚️', label: 'My Wellness',      action: () => setActiveSection('watch') },
+    { id: 'map',         icon: '🗺️', label: 'Find a Clinic',    action: () => setActiveSection('map') },
+    { id: 'specialists', icon: '👨‍⚕️', label: 'Find a Specialist', action: () => setActiveSection('specialists') },
+    // Quick Screening left in the back for now — section still exists, not in nav
+    // { id: 'screening',   icon: '❤️', label: 'Quick Screening',  action: () => setActiveSection('screening') },
   ];
 
   return (
@@ -168,29 +225,105 @@ export const Dashboard = () => {
       </aside>
 
       {/* ── Main Content ─────────────────────────────────────────────────────── */}
-      <main ref={mainRef} className="flex-1 overflow-auto flex flex-col min-w-0">
+      <main
+        ref={mainRef}
+        className={`flex-1 flex flex-col min-w-0 ${activeSection === 'map' ? 'overflow-hidden h-full' : 'overflow-auto'}`}
+      >
 
-        {/* Greeting header */}
-        <div className="px-8 py-8 border-b border-rose-100 bg-white flex items-center gap-6 flex-shrink-0">
-          <div className="flex-1 min-w-0">
-            <h1 className="fade-in-up delay-1 text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight mb-1">
-              Welcome back,{' '}
-              <span className="text-rose-600">{user?.name?.split(' ')[0] ?? 'there'}</span>
-            </h1>
-            <p className="fade-in-up delay-2 text-gray-400 text-sm">
-              {sessions.length > 0
-                ? `${sessions.length} session${sessions.length !== 1 ? 's' : ''} recorded · How are you feeling today?`
-                : "No sessions yet — start your first call with Dr. Maple."}
-            </p>
-          </div>
-          <div className="hidden md:block relative flex-shrink-0">
-            <div className="absolute w-32 h-32 rounded-full bg-rose-100 blur-2xl opacity-60" />
-            <img src="/mascot-wave.png" alt="Dr. Maple" className="relative z-10 w-32 h-32 object-contain drop-shadow-xl" />
-          </div>
-        </div>
+        {/* Greeting header — removed per request */}
+        <div
+          className={`flex-1 ${activeSection === 'map' ? 'overflow-hidden min-h-0' : 'px-8 py-8 overflow-auto'} min-h-0`}
+        >
 
-        {/* Section content */}
-        <div className={`flex-1 ${activeSection === 'map' ? '' : 'px-8 py-8'} min-h-0 overflow-auto`}>
+          {/* ── Home — welcome & what you can do today ───────────────────────── */}
+          {activeSection === 'home' && (
+            <div className="min-h-[60vh] pb-16">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+                Welcome back{user?.name ? `, ${user.name.split(/\s+/)[0]}` : ''}.
+              </h1>
+              <p className="text-gray-500 text-sm mb-8">
+                Here’s everything you can do today — start with a call or explore below.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <button
+                  type="button"
+                  onClick={() => navigate('/call')}
+                  className="group text-left rounded-2xl border-2 border-rose-200 bg-rose-50/50 p-6 shadow-sm hover:shadow-md hover:border-rose-300 hover:bg-rose-50 transition-all"
+                >
+                  <span className="text-3xl block mb-3">📞</span>
+                  <h3 className="font-bold text-gray-900 text-lg mb-1">New Call</h3>
+                  <p className="text-sm text-gray-600">
+                    Talk to Dr. Maple about symptoms and get triage advice.
+                  </p>
+                  <span className="inline-block mt-3 text-rose-600 font-medium text-sm group-hover:underline">Start a call →</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('history')}
+                  className="group text-left rounded-2xl border border-rose-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-rose-200 transition-all"
+                >
+                  <span className="text-3xl block mb-3">📋</span>
+                  <h3 className="font-bold text-gray-900 text-lg mb-1">Health History</h3>
+                  <p className="text-sm text-gray-600">
+                    View past sessions, triage results, and reports.
+                  </p>
+                  <span className="inline-block mt-3 text-rose-600 font-medium text-sm group-hover:underline">View history →</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('watch')}
+                  className="group text-left rounded-2xl border border-rose-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-rose-200 transition-all"
+                >
+                  <span className="text-3xl block mb-3">⌚️</span>
+                  <h3 className="font-bold text-gray-900 text-lg mb-1">My Wellness</h3>
+                  <p className="text-sm text-gray-600">
+                    Apple Watch data: sleep, heart rate, steps, exercise.
+                  </p>
+                  <span className="inline-block mt-3 text-rose-600 font-medium text-sm group-hover:underline">Open →</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('map')}
+                  className="group text-left rounded-2xl border border-rose-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-rose-200 transition-all"
+                >
+                  <span className="text-3xl block mb-3">🗺️</span>
+                  <h3 className="font-bold text-gray-900 text-lg mb-1">Find a Clinic</h3>
+                  <p className="text-sm text-gray-600">
+                    Map of nearby hospitals, walk-ins, and directions.
+                  </p>
+                  <span className="inline-block mt-3 text-rose-600 font-medium text-sm group-hover:underline">Open map →</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('specialists')}
+                  className="group text-left rounded-2xl border border-rose-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-rose-200 transition-all"
+                >
+                  <span className="text-3xl block mb-3">👨‍⚕️</span>
+                  <h3 className="font-bold text-gray-900 text-lg mb-1">Find a Specialist</h3>
+                  <p className="text-sm text-gray-600">
+                    Official provincial directories to find and contact doctors.
+                  </p>
+                  <span className="inline-block mt-3 text-rose-600 font-medium text-sm group-hover:underline">Search →</span>
+                </button>
+                {/* Quick Screening left in the back for now — no card on home */}
+              </div>
+
+              <div className="mt-10 pt-6 border-t border-rose-100">
+                <button
+                  type="button"
+                  onClick={() => navigate('/profile')}
+                  className="rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 transition-colors"
+                >
+                  Profile & settings
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ── Health History ─────────────────────────────────────────────── */}
           {activeSection === 'history' && (
@@ -262,10 +395,11 @@ export const Dashboard = () => {
             </div>
           )}
 
-          {/* ── Apple Watch ────────────────────────────────────────────────── */}
+          {/* ── My Wellness ────────────────────────────────────────────────── */}
           {activeSection === 'watch' && (
-            <div className="max-w-2xl min-h-[70vh] pb-20 space-y-10">
-              <h2 className="text-xl font-bold text-gray-800">Apple Watch Companion</h2>
+            <div className="flex gap-8 min-h-[70vh] pb-20">
+              <div className="flex-1 min-w-0 max-w-2xl space-y-10">
+              <h2 className="text-xl font-bold text-gray-800">My Wellness</h2>
 
               {/* Pairing / Paired card */}
               <div className="card border border-rose-100 p-6 rounded-2xl">
@@ -652,11 +786,362 @@ export const Dashboard = () => {
                 <WatchCompanionStats metrics={watchMetrics} isLoading={watchLoading} />
               </div>
             </div>
+
+            {/* Right: Symptom log (personal use) */}
+            <aside className="w-80 flex-shrink-0">
+              <div className="sticky top-8 rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-800 mb-1">Symptom log</h3>
+                <p className="text-xs text-gray-500 mb-4">For your own tracking only — not shared.</p>
+                <div className="space-y-3 mb-4">
+                  <input
+                    type="text"
+                    placeholder="Symptom (e.g. headache)"
+                    value={symptomInput}
+                    onChange={(e) => setSymptomInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addSymptom()}
+                    className="w-full rounded-lg border border-rose-100 px-3 py-2 text-sm placeholder:text-gray-400 focus:ring-2 focus:ring-rose-200 focus:border-rose-300"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Optional note"
+                    value={symptomNote}
+                    onChange={(e) => setSymptomNote(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addSymptom()}
+                    className="w-full rounded-lg border border-rose-100 px-3 py-2 text-sm placeholder:text-gray-400 focus:ring-2 focus:ring-rose-200 focus:border-rose-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={addSymptom}
+                    className="w-full text-sm font-medium text-rose-600 hover:text-rose-700 border border-rose-200 hover:border-rose-300 rounded-lg py-2 transition-colors"
+                  >
+                    Add to log
+                  </button>
+                </div>
+                <div className="border-t border-rose-100 pt-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent entries</p>
+                  {symptomLog.length === 0 ? (
+                    <p className="text-xs text-gray-400">No entries yet. Add symptoms above.</p>
+                  ) : (
+                    <ul className="space-y-2 max-h-64 overflow-y-auto">
+                      {symptomLog.slice(0, 30).map((entry) => (
+                        <li key={entry.id} className="flex items-start justify-between gap-2 text-sm">
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-800 truncate">{entry.symptom}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(entry.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {entry.note ? ` · ${entry.note}` : ''}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeSymptom(entry.id)}
+                            className="text-gray-400 hover:text-red-500 text-xs flex-shrink-0"
+                            aria-label="Remove"
+                          >
+                            ×
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </aside>
+            </div>
+          )}
+
+          {/* ── Find a Specialist ───────────────────────────────────────────── */}
+          {activeSection === 'specialists' && (
+            <div className="max-w-3xl min-h-[60vh] pb-16 space-y-8">
+              <h2 className="text-xl font-bold text-gray-800">Find a specialist</h2>
+              <p className="text-gray-600 text-sm">
+                In Canada, health care is managed by provinces and territories. Each province’s <strong>College of Physicians and Surgeons</strong> keeps an official, searchable directory of licensed doctors. You can look up a doctor by name, specialty, location, or language, and check their credentials and contact details. The Government of Canada also recommends asking for recommendations, contacting a Community Health Centre, or visiting a walk-in clinic for non-urgent care.
+              </p>
+
+              <div className="rounded-2xl border border-rose-100 bg-white p-6 shadow-sm space-y-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Province</label>
+                  <select
+                    value={specialistProvince}
+                    onChange={(e) => setSpecialistProvince(e.target.value)}
+                    className="w-full max-w-xs rounded-lg border border-rose-100 px-3 py-2 text-sm focus:ring-2 focus:ring-rose-200 focus:border-rose-300"
+                  >
+                    {Object.entries(PROVINCIAL_DOCTOR_DIRECTORIES).map(([code, { name }]) => (
+                      <option key={code} value={code}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {specialistProvince === 'ON' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Search Ontario doctors (name or CPSO number)</label>
+                    <div className="flex gap-2 flex-wrap">
+                      <input
+                        type="text"
+                        placeholder="e.g. Smith or 12345"
+                        value={specialistSearch}
+                        onChange={(e) => setSpecialistSearch(e.target.value)}
+                        minLength={3}
+                        className="flex-1 min-w-[200px] rounded-lg border border-rose-100 px-3 py-2 text-sm placeholder:text-gray-400 focus:ring-2 focus:ring-rose-200 focus:border-rose-300"
+                      />
+                      <a
+                        href={
+                          specialistSearch.trim().length >= 3
+                            ? `https://doctors.cpso.on.ca/Doctor-Search-Results?term=${encodeURIComponent(specialistSearch.trim())}&type=name`
+                            : 'https://doctors.cpso.on.ca/Doctor-Search-Results'
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-primary py-2 px-5 text-sm whitespace-nowrap"
+                      >
+                        Search Ontario register
+                      </a>
+                      <a
+                        href="https://doctors.cpso.on.ca/Advanced-Search"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 py-2 px-4 text-sm font-medium transition-colors"
+                      >
+                        Advanced search (specialty, city, language)
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <a
+                    href={PROVINCIAL_DOCTOR_DIRECTORIES[specialistProvince]?.searchUrl ?? '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-rose-600 hover:text-rose-800 font-semibold text-sm"
+                  >
+                    Open {PROVINCIAL_DOCTOR_DIRECTORIES[specialistProvince]?.name ?? specialistProvince} physician directory →
+                  </a>
+                  {PROVINCIAL_DOCTOR_DIRECTORIES[specialistProvince]?.advancedUrl && (
+                    <>
+                      <span className="text-gray-300 mx-2">·</span>
+                      <a
+                        href={PROVINCIAL_DOCTOR_DIRECTORIES[specialistProvince].advancedUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-rose-600 hover:text-rose-800 font-medium text-sm"
+                      >
+                        Advanced search
+                      </a>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-6 space-y-3">
+                <h3 className="font-bold text-gray-800">How to find and contact doctors</h3>
+                <p className="text-sm text-gray-600">
+                  Health care in Canada is run by provinces and territories. Official ways to find a doctor:
+                </p>
+                <ul className="text-sm text-gray-600 space-y-2 list-disc list-inside">
+                  <li><strong>Ask for a recommendation</strong> — From someone you know, or contact a settlement services provider or Community Health Centre in your area.</li>
+                  <li><strong>Provincial college directories</strong> (above) — Each province’s College of Physicians and Surgeons lists licensed doctors; you can verify credentials, specialty, and practice location and find contact information when listed.</li>
+                  <li><strong>Health Care Connect</strong> (Ontario) — Call <a href="tel:1-800-445-1822" className="text-rose-600 hover:underline">1-800-445-1822</a> or 811 (Telehealth Ontario) to get help finding a doctor or nurse practitioner who is accepting patients.</li>
+                  <li><strong>811</strong> — Your province’s health line; nurses can advise and may help with referrals (e.g. BC Nurse Line, Alberta Health Link, Info-Santé in Quebec).</li>
+                  <li><strong>Walk-in clinics</strong> — For non-urgent care if you don’t have a family doctor; you can register when you arrive. For specialist care, ask your doctor or a walk-in physician for a referral.</li>
+                  <li><strong>Hospitals and clinics</strong> — Many list physicians on their website; you can ask for a referral to a specialist.</li>
+                </ul>
+                <p className="text-xs text-gray-500 pt-1">
+                  Source: <a href="https://www.canada.ca/en/immigration-refugees-citizenship/services/settle-canada/health-care/find-doctors.html" target="_blank" rel="noopener noreferrer" className="text-rose-600 hover:underline">Canada.ca – Find doctors and dentists</a>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Quick screening (Apple Watch vitals) ───────────────────────── */}
+          {activeSection === 'screening' && (
+            <div className="max-w-2xl min-h-[60vh] pb-16 space-y-8">
+              <h2 className="text-xl font-bold text-gray-800">Quick screening</h2>
+              <p className="text-gray-600 text-sm">
+                Uses your latest Apple Watch data for a quick check. Sync from the Dr. Maple Watch app to refresh.
+                For personal awareness only — not a medical diagnosis.
+              </p>
+
+              {!watchPaired && !watchLoading && (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-6 text-center">
+                  <p className="text-gray-700 font-medium mb-2">No Watch data yet</p>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Pair your Apple Watch in <strong>My Wellness</strong> and sync to see your vitals and activity here.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection('watch')}
+                    className="text-rose-600 hover:text-rose-700 font-semibold text-sm"
+                  >
+                    Go to My Wellness →
+                  </button>
+                </div>
+              )}
+
+              {(watchLoading || (watchPaired && watchMetrics != null && (
+                watchMetrics.avgHeartRate != null ||
+                watchMetrics.stepsToday != null ||
+                watchMetrics.exerciseMinutes != null ||
+                watchMetrics.sleepDurationHours != null ||
+                watchMetrics.standHours != null ||
+                watchMetrics.activeEnergyKcal != null
+              ))) && (
+                <div className="rounded-2xl border border-rose-100 bg-white p-6 shadow-sm space-y-6">
+                  {watchLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="w-8 h-8 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {watchMetrics?.avgHeartRate != null && (
+                          <div className="rounded-xl bg-rose-50 p-4 border border-rose-100">
+                            <p className="text-xs font-semibold text-rose-600 uppercase tracking-wide mb-1">Heart rate</p>
+                            <p className="text-2xl font-bold text-gray-900 tabular-nums">{Math.round(watchMetrics.avgHeartRate)}</p>
+                            <p className="text-xs text-gray-500">bpm</p>
+                          </div>
+                        )}
+                        {watchMetrics?.stepsToday != null && (
+                          <div className="rounded-xl bg-emerald-50 p-4 border border-emerald-100">
+                            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">Steps today</p>
+                            <p className="text-2xl font-bold text-gray-900 tabular-nums">{watchMetrics.stepsToday.toLocaleString()}</p>
+                            <p className="text-xs text-gray-500">steps</p>
+                          </div>
+                        )}
+                        {watchMetrics?.exerciseMinutes != null && (
+                          <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
+                            <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">Exercise</p>
+                            <p className="text-2xl font-bold text-gray-900 tabular-nums">{watchMetrics.exerciseMinutes}</p>
+                            <p className="text-xs text-gray-500">min today</p>
+                          </div>
+                        )}
+                        {watchMetrics?.sleepDurationHours != null && (
+                          <div className="rounded-xl bg-violet-50 p-4 border border-violet-100">
+                            <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-1">Sleep (last night)</p>
+                            <p className="text-2xl font-bold text-gray-900 tabular-nums">
+                              {watchMetrics.sleepDurationHours < 1
+                                ? `${Math.round(watchMetrics.sleepDurationHours * 60)}m`
+                                : `${Math.floor(watchMetrics.sleepDurationHours)}h ${Math.round((watchMetrics.sleepDurationHours % 1) * 60)}m`}
+                            </p>
+                            <p className="text-xs text-gray-500">{watchMetrics.sleepQuality ?? 'duration'}</p>
+                          </div>
+                        )}
+                        {watchMetrics?.standHours != null && (
+                          <div className="rounded-xl bg-blue-50 p-4 border border-blue-100">
+                            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Stand hours</p>
+                            <p className="text-2xl font-bold text-gray-900 tabular-nums">{watchMetrics.standHours}</p>
+                            <p className="text-xs text-gray-500">hours stood</p>
+                          </div>
+                        )}
+                        {watchMetrics?.activeEnergyKcal != null && (
+                          <div className="rounded-xl bg-orange-50 p-4 border border-orange-100">
+                            <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-1">Active energy</p>
+                            <p className="text-2xl font-bold text-gray-900 tabular-nums">{Math.round(watchMetrics.activeEnergyKcal)}</p>
+                            <p className="text-xs text-gray-500">kcal</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {watchMetrics?.updatedAt && (
+                        <p className="text-xs text-gray-400">
+                          Last synced {new Date(watchMetrics.updatedAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+
+                      <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                        <h3 className="text-sm font-bold text-gray-800 mb-2">Quick take</h3>
+                        <ul className="text-sm text-gray-600 space-y-1.5">
+                          {watchMetrics?.avgHeartRate != null && (
+                            <li>
+                              <strong>Heart rate:</strong>{' '}
+                              {watchMetrics.avgHeartRate > 100
+                                ? 'Elevated for rest (activity, stress, or caffeine can raise it).'
+                                : watchMetrics.avgHeartRate < 50
+                                ? 'On the lower side (common in fit individuals).'
+                                : 'Within typical resting range (60–100 bpm).'}
+                            </li>
+                          )}
+                          {watchMetrics?.stepsToday != null && (
+                            <li>
+                              <strong>Steps:</strong>{' '}
+                              {watchMetrics.stepsToday >= 7000
+                                ? 'Good movement today.'
+                                : watchMetrics.stepsToday >= 4000
+                                ? 'Moderate activity; 7k+ is a common goal.'
+                                : 'Low steps so far — try a short walk.'}
+                            </li>
+                          )}
+                          {watchMetrics?.exerciseMinutes != null && (
+                            <li>
+                              <strong>Exercise:</strong>{' '}
+                              {watchMetrics.exerciseMinutes >= 30
+                                ? 'Solid activity today (guidelines suggest 150+ min/week).'
+                                : watchMetrics.exerciseMinutes >= 10
+                                ? 'Some movement in; more helps heart health.'
+                                : 'Little formal exercise today.'}
+                            </li>
+                          )}
+                          {watchMetrics?.sleepDurationHours != null && (
+                            <li>
+                              <strong>Sleep:</strong>{' '}
+                              {watchMetrics.sleepDurationHours >= 7 && watchMetrics.sleepDurationHours <= 9
+                                ? 'Duration in the 7–9 hour range many adults need.'
+                                : watchMetrics.sleepDurationHours < 6
+                                ? 'Short sleep; rest supports recovery and mood.'
+                                : 'Consider aiming for 7–9 hours when you can.'}
+                            </li>
+                          )}
+                          {watchMetrics?.standHours != null && (
+                            <li>
+                              <strong>Standing:</strong>{' '}
+                              {watchMetrics.standHours >= 10
+                                ? 'Good mix of standing and moving.'
+                                : watchMetrics.standHours >= 6
+                                ? 'Some standing; breaking up sitting helps.'
+                                : 'Few stand hours — try standing when you can.'}
+                            </li>
+                          )}
+                          {watchMetrics?.activeEnergyKcal != null && (
+                            <li>
+                              <strong>Active burn:</strong>{' '}
+                              {watchMetrics.activeEnergyKcal >= 400
+                                ? 'High active energy today.'
+                                : watchMetrics.activeEnergyKcal >= 200
+                                ? 'Moderate active burn.'
+                                : 'Low active burn so far.'}
+                            </li>
+                          )}
+                        </ul>
+                        <p className="text-xs text-gray-500 mt-3">
+                          For medical advice or if you feel unwell, call 811 or see a healthcare provider.
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {watchPaired && !watchLoading && watchMetrics != null && [
+                watchMetrics.avgHeartRate,
+                watchMetrics.stepsToday,
+                watchMetrics.exerciseMinutes,
+                watchMetrics.sleepDurationHours,
+                watchMetrics.standHours,
+                watchMetrics.activeEnergyKcal,
+              ].every(v => v == null) && (
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-6 text-center">
+                  <p className="text-amber-800 font-medium mb-1">No data in this sync</p>
+                  <p className="text-sm text-amber-700">
+                    Sync again from the Watch app. Heart rate, steps, and sleep usually appear after a sync.
+                  </p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* ── Find a Clinic ──────────────────────────────────────────────── */}
           {activeSection === 'map' && (
-            <div style={{ height: 'calc(100vh - 120px)' }}>
+            <div className="flex-1 min-h-0 flex flex-col">
               <ClinicMap />
             </div>
           )}

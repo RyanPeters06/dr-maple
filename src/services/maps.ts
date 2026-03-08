@@ -1,3 +1,5 @@
+export type ClinicType = 'hospital' | 'clinic' | 'specialized';
+
 export interface ClinicResult {
   id: string;
   name: string;
@@ -6,8 +8,10 @@ export interface ClinicResult {
   lng: number;
   rating?: number;
   isOpen?: boolean;
-  type: 'hospital' | 'clinic';
+  type: ClinicType;
   waitTime: string;
+  /** Approximate wait in minutes for sorting (e.g. 15 for "10–20 min", 90 for "1–2 hrs") */
+  waitMinutesEst?: number;
   phone?: string;
   website?: string;
   mapsUrl: string;
@@ -22,6 +26,23 @@ const CLINIC_WAIT_RANGES = [
 
 const randomFrom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 
+/** Parse wait time string to approximate minutes for sorting */
+function waitToMinutes(s: string): number {
+  const hr = s.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+)\s*hr/i) || s.match(/(\d+(?:\.\d+)?)\s*hr/i);
+  if (hr) {
+    const a = parseFloat(hr[1]);
+    const b = hr[2] ? parseFloat(hr[2]) : a;
+    return Math.round((a + b) / 2 * 60);
+  }
+  const min = s.match(/(\d+)\s*[-–]\s*(\d+)\s*min/i) || s.match(/(\d+)\s*min/i);
+  if (min) {
+    const a = parseInt(min[1], 10);
+    const b = min[2] ? parseInt(min[2], 10) : a;
+    return Math.round((a + b) / 2);
+  }
+  return 999;
+}
+
 export const searchNearbyClinics = (
   location: { lat: number; lng: number },
   onResult: (clinics: ClinicResult[]) => void,
@@ -29,9 +50,14 @@ export const searchNearbyClinics = (
 ): void => {
   const service = new google.maps.places.PlacesService(document.createElement('div'));
 
-  const searches: Array<{ type: google.maps.places.PlaceType; clinicType: 'hospital' | 'clinic' }> = [
+  const searches: Array<{ type: google.maps.places.PlaceType; clinicType: ClinicType }> = [
     { type: 'hospital' as google.maps.places.PlaceType, clinicType: 'hospital' },
     { type: 'doctor' as google.maps.places.PlaceType, clinicType: 'clinic' },
+    { type: 'physiotherapist' as google.maps.places.PlaceType, clinicType: 'specialized' },
+  ];
+
+  const SPECIALIZED_WAIT_RANGES = [
+    '15–30 min', '30–45 min', '1–2 weeks', '2–3 weeks', 'Same day',
   ];
 
   const results: ClinicResult[] = [];
@@ -61,9 +87,15 @@ export const searchNearbyClinics = (
               waitTime:
                 clinicType === 'hospital'
                   ? randomFrom(HOSPITAL_WAIT_RANGES)
+                  : clinicType === 'specialized'
+                  ? randomFrom(SPECIALIZED_WAIT_RANGES)
                   : randomFrom(CLINIC_WAIT_RANGES),
+              waitMinutesEst: 0, // set below
               mapsUrl: `https://www.google.com/maps/place/?q=place_id:${placeId}`,
             };
+          });
+          mapped.forEach(m => {
+            (m as ClinicResult).waitMinutesEst = waitToMinutes(m.waitTime);
           });
           results.push(...mapped);
         }

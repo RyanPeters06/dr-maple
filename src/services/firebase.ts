@@ -51,6 +51,7 @@ export interface SessionRecord {
 
 export interface AppleWatchMetrics {
   avgHeartRate?: number | null;
+  breathsPerMinute?: number | null;
   stepsToday?: number;
   activeEnergyKcal?: number;
   exerciseMinutes?: number;
@@ -208,6 +209,7 @@ export const subscribeAppleWatchMetrics = (
 
       const metrics: AppleWatchMetrics = {
         avgHeartRate: data.avgHeartRate ?? null,
+        breathsPerMinute: data.breathsPerMinute ?? data.respiratoryRate ?? null,
         stepsToday: data.stepsToday,
         activeEnergyKcal: data.activeEnergyKcal,
         exerciseMinutes: data.exerciseMinutes,

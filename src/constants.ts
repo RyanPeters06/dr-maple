@@ -71,3 +71,16 @@ export const ELEVENLABS_MODELS = {
   multilingual: 'eleven_multilingual_v2',
   turbo: 'eleven_turbo_v2',
 } as const;
+
+/** Official provincial physician directories (College of Physicians and Surgeons). Link out to search. */
+export const PROVINCIAL_DOCTOR_DIRECTORIES: Record<string, { name: string; searchUrl: string; advancedUrl?: string }> = {
+  ON: { name: 'Ontario', searchUrl: 'https://doctors.cpso.on.ca/Doctor-Search-Results', advancedUrl: 'https://doctors.cpso.on.ca/Advanced-Search' },
+  AB: { name: 'Alberta', searchUrl: 'https://search.cpsa.ca/' },
+  BC: { name: 'British Columbia', searchUrl: 'https://www.cpsbc.ca/public/registrant-directory' },
+  QC: { name: 'Quebec', searchUrl: 'https://www.cmq.org/en/directory' },
+  MB: { name: 'Manitoba', searchUrl: 'https://www.cpsm.mb.ca/' },
+  SK: { name: 'Saskatchewan', searchUrl: 'https://www.cps.sk.ca/' },
+  NS: { name: 'Nova Scotia', searchUrl: 'https://cpsns.ns.ca/physician-search' },
+  NB: { name: 'New Brunswick', searchUrl: 'https://www.cpsnb.org/en/find-a-physician' },
+  NL: { name: 'Newfoundland & Labrador', searchUrl: 'https://cpsnl.ca/' },
+};

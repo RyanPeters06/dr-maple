@@ -15,9 +15,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const HomeRedirect = () => {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isLoading } = useAuth0();
   if (isLoading) return null;
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return <Landing />;
 };
 

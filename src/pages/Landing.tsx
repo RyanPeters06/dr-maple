@@ -5,7 +5,7 @@ import { CANADIAN_RESOURCES } from '../constants';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 
 export const Landing = () => {
-  const { loginWithRedirect } = useAuth0();
+  const { loginWithRedirect, isAuthenticated } = useAuth0();
   const navigate = useNavigate();
   const pageRef = useRef<HTMLDivElement>(null);
   useScrollReveal(pageRef);
@@ -15,7 +15,9 @@ export const Landing = () => {
 
       {/* ── Nav ─────────────────────────────────────────────────────────────── */}
       <nav className="flex items-center justify-between px-8 py-4 border-b border-rose-100">
-        <img src="/dr-maple-logo.png" alt="Dr. Maple" className="h-28 object-contain" />
+        <button type="button" onClick={() => navigate('/')} className="flex items-center">
+          <img src="/dr-maple-logo.png" alt="Dr. Maple" className="h-28 object-contain" />
+        </button>
 
         <div className="hidden md:flex items-center gap-8">
           {['How It Works', 'Features', 'For Canadians'].map(label => (
@@ -30,12 +32,20 @@ export const Landing = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button onClick={() => loginWithRedirect()} className="text-sm text-gray-500 hover:text-rose-600 font-medium transition-colors">
-            Sign In
-          </button>
-          <button onClick={() => loginWithRedirect()} className="btn-primary py-2 px-5 text-sm">
-            Try for Free
-          </button>
+          {isAuthenticated ? (
+            <button onClick={() => navigate('/dashboard')} className="btn-primary py-2 px-5 text-sm">
+              Go to Dashboard
+            </button>
+          ) : (
+            <>
+              <button onClick={() => loginWithRedirect()} className="text-sm text-gray-500 hover:text-rose-600 font-medium transition-colors">
+                Sign In
+              </button>
+              <button onClick={() => loginWithRedirect()} className="btn-primary py-2 px-5 text-sm">
+                Try for Free
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
@@ -56,9 +66,15 @@ export const Landing = () => {
           </p>
 
           <div className="fade-in-up delay-3 flex items-center gap-4 flex-wrap">
-            <button onClick={() => loginWithRedirect()} className="btn-primary text-base px-8 py-3.5">
-              Get Started Free
-            </button>
+            {isAuthenticated ? (
+              <button onClick={() => navigate('/dashboard')} className="btn-primary text-base px-8 py-3.5">
+                Go to Dashboard
+              </button>
+            ) : (
+              <button onClick={() => loginWithRedirect()} className="btn-primary text-base px-8 py-3.5">
+                Get Started Free
+              </button>
+            )}
             <button
               onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
               className="flex items-center gap-2 text-gray-500 hover:text-rose-600 text-sm font-medium transition-colors"
@@ -155,8 +171,8 @@ export const Landing = () => {
               Telehealth Ontario, Health Link Alberta, and more.
             </p>
           </div>
-          <button onClick={() => loginWithRedirect()} className="btn-primary whitespace-nowrap px-8 py-3.5">
-            Get Started Free
+          <button onClick={() => isAuthenticated ? navigate('/dashboard') : loginWithRedirect()} className="btn-primary whitespace-nowrap px-8 py-3.5">
+            {isAuthenticated ? 'Go to Dashboard' : 'Get Started Free'}
           </button>
         </div>
       </section>
