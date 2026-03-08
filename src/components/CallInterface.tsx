@@ -5,7 +5,6 @@ import { DoctorAvatar } from './DoctorAvatar';
 import { LiveVitals } from './LiveVitals';
 import { useGemini } from '../hooks/useGemini';
 import { useElevenLabs } from '../hooks/useElevenLabs';
-import { usePresage } from '../hooks/usePresage';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useRecorder } from '../hooks/useRecorder';
 import { useUserProfile } from '../hooks/useUserProfile';
@@ -15,6 +14,8 @@ import type { TriageResult } from '../constants';
 import type { WellnessContext } from '../services/gemini';
 
 type CallState = 'idle' | 'starting' | 'active' | 'ended';
+
+const pendingSessionKey = (uid: string) => `dr-maple-pending-${uid}`;
 
 export const CallInterface = () => {
   const navigate = useNavigate();
@@ -39,8 +40,13 @@ export const CallInterface = () => {
     initChat, startCall, sendPatientMessage, sendPhotoMessage, dismissPhotoRequest,
   } = useGemini();
   const { speak, stop: stopSpeaking, isSpeaking, ttsError } = useElevenLabs();
-  const { vitals } = usePresage(videoRef);
   const { metrics: watchMetrics } = useAppleWatchMetrics();
+  // Derive real vitals from Apple Watch data when paired; fall back to null
+  const vitals = {
+    heartRate: watchMetrics?.avgHeartRate ?? null,
+    breathingRate: watchMetrics?.breathsPerMinute ?? null,
+    stressLevel: null as number | null,
+  };
   const { startRecording, stopRecording, downloadRecording } = useRecorder();
   const { profile } = useUserProfile(user?.sub);
 
@@ -56,6 +62,21 @@ export const CallInterface = () => {
     }
     return () => { if (durationRef.current) clearInterval(durationRef.current); };
   }, [callState]);
+
+  // Keep a localStorage backup of the in-progress session so it survives navigation
+  // away from the call screen or an accidental tab/browser close.
+  useEffect(() => {
+    if (!user?.sub) return;
+    if (callState !== 'active') return;
+    if (!transcript.some(m => m.role === 'patient')) return;
+    try {
+      localStorage.setItem(pendingSessionKey(user.sub), JSON.stringify({
+        timestamp: new Date().toISOString(),
+        triageResult: triageResult ?? undefined,
+        transcript: transcript.map(m => ({ role: m.role, text: m.text })),
+      }));
+    } catch { /* storage unavailable — non-fatal */ }
+  }, [transcript, triageResult, callState, user?.sub]);
 
   const formatDuration = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -133,15 +154,20 @@ export const CallInterface = () => {
     stopCamera();
     const blob = stopRecording();
     if (blob && callDuration > 10) setRecordingBlob(blob);
-    if (user && transcript.length > 0) {
+
+    const hasPatientResponse = transcript.some(m => m.role === 'patient');
+    if (user?.sub && hasPatientResponse) {
       setIsSavingSession(true);
       try {
-        const id = await saveSession(user.sub!, {
+        const id = await saveSession(user.sub, {
           triageResult: triageResult ?? undefined,
           transcript: transcript.map(m => ({ role: m.role, text: m.text })),
           duration: callDuration,
         });
-        if (id) setSavedSessionId(id);
+        if (id) {
+          setSavedSessionId(id);
+          try { localStorage.removeItem(pendingSessionKey(user.sub)); } catch { /* ignore */ }
+        }
       } catch { /* non-fatal */ } finally {
         setIsSavingSession(false);
       }

@@ -6,7 +6,6 @@ interface ImportMetaEnv {
   readonly VITE_GEMINI_API_KEY: string;
   readonly VITE_ELEVENLABS_API_KEY: string;
   readonly VITE_ELEVENLABS_VOICE_ID: string;
-  readonly VITE_PRESAGE_API_KEY: string;
   readonly VITE_GOOGLE_MAPS_API_KEY: string;
   readonly VITE_FIREBASE_API_KEY: string;
   readonly VITE_FIREBASE_PROJECT_ID: string;

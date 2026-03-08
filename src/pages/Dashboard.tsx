@@ -9,7 +9,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useUserProfile } from '../hooks/useUserProfile';
-import { createPairingCode, clearAppleWatchMetrics, getSymptomLog, saveSymptomLog, type SymptomEntry as FirebaseSymptomEntry } from '../services/firebase';
+import { createPairingCode, clearAppleWatchMetrics, getSymptomLog, saveSymptomLog, saveSession, type SymptomEntry as FirebaseSymptomEntry } from '../services/firebase';
+import type { TriageResult } from '../constants';
 
 type DashSection = 'home' | 'history' | 'map' | 'watch' | 'specialists' | 'screening';
 type WatchBlockDetail = 'sleep' | 'heartRate' | 'exercise' | 'steps' | null;
@@ -91,6 +92,33 @@ export const Dashboard = () => {
     if (user?.sub) saveSymptomLog(user.sub, symptomLog);
   }, [user?.sub, symptomLog]);
 
+  // Recover any session that was cut off (navigation away or tab close) and upload it to Firebase
+  useEffect(() => {
+    if (!user?.sub) return;
+    const key = `dr-maple-pending-${user.sub}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const pending = JSON.parse(raw) as {
+        timestamp: string;
+        triageResult?: TriageResult;
+        transcript: { role: 'doctor' | 'patient'; text: string }[];
+      };
+      if (!Array.isArray(pending.transcript) || !pending.transcript.some(m => m.role === 'patient')) {
+        localStorage.removeItem(key);
+        return;
+      }
+      saveSession(user.sub, {
+        triageResult: pending.triageResult,
+        transcript: pending.transcript,
+      })
+        .then(id => { if (id) localStorage.removeItem(key); })
+        .catch(() => { /* leave it — will retry on next Dashboard load */ });
+    } catch {
+      localStorage.removeItem(key);
+    }
+  }, [user?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const addSymptom = () => {
     const trimmed = symptomInput.trim();
     if (!trimmed) return;
@@ -114,6 +142,39 @@ export const Dashboard = () => {
       });
     } catch { return iso; }
   };
+
+  const formatTime = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
+    } catch { return ''; }
+  };
+
+  const formatDateHeading = (dateKey: string) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const todayKey = today.toLocaleDateString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const yesterdayKey = yesterday.toLocaleDateString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const label = new Date(dateKey + 'T12:00:00').toLocaleDateString('en-CA', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    if (dateKey === todayKey) return `${label} — Today`;
+    if (dateKey === yesterdayKey) return `${label} — Yesterday`;
+    return label;
+  };
+
+  // Group sessions by calendar date (YYYY-MM-DD), preserving timestamp-desc order
+  const sessionsByDate: { dateKey: string; items: typeof sessions }[] = [];
+  for (const session of sessions) {
+    try {
+      const dateKey = new Date(session.timestamp).toLocaleDateString('en-CA', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+      });
+      const group = sessionsByDate.find(g => g.dateKey === dateKey);
+      if (group) group.items.push(session);
+      else sessionsByDate.push({ dateKey, items: [session] });
+    } catch { /* skip malformed timestamps */ }
+  }
 
   const formatDuration = (secs?: number) => {
     if (!secs) return null;
@@ -361,54 +422,70 @@ export const Dashboard = () => {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {sessions.map((session, idx) => {
-                    const style = getUrgencyStyle(session.triageResult?.urgency ?? 'Non-urgent');
-                    return (
-                      <button
-                        key={session.id}
-                        onClick={() => navigate(`/report/${session.id}`)}
-                        className={`fade-in-up delay-${Math.min(idx + 1, 6)} text-left bg-white border border-rose-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-rose-300 transition-all group`}
-                      >
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {session.triageResult ? (
-                              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold text-white ${style.bgClass}`}>
-                                {session.triageResult.urgency}
-                              </span>
-                            ) : (
-                              <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-gray-100 text-gray-500">
-                                Transcript only
-                              </span>
-                            )}
-                            <span className="text-xs text-gray-400">{formatDate(session.timestamp)}</span>
-                            {session.duration && (
-                              <span className="text-xs text-gray-300">{formatDuration(session.duration)}</span>
-                            )}
-                          </div>
-                          <span className="text-gray-300 group-hover:text-rose-400 transition-colors text-sm flex-shrink-0">→</span>
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">
-                          {session.triageResult?.action ?? 'Consultation recorded'}
-                        </p>
-                        <p className="text-xs text-gray-400 line-clamp-2 mb-3">
-                          {session.triageResult?.summary ?? `${session.transcript?.length ?? 0} messages — no triage result generated`}
-                        </p>
-                        {session.triageResult?.symptoms && session.triageResult.symptoms.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {session.triageResult.symptoms.slice(0, 3).map((s, i) => (
-                              <span key={i} className="text-xs bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-full">
-                                {s}
-                              </span>
-                            ))}
-                            {session.triageResult.symptoms.length > 3 && (
-                              <span className="text-xs text-gray-400">+{session.triageResult.symptoms.length - 3} more</span>
-                            )}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
+                <div className="space-y-10">
+                  {sessionsByDate.map(({ dateKey, items }) => (
+                    <div key={dateKey}>
+                      {/* Date heading */}
+                      <div className="flex items-center gap-3 mb-4">
+                        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">
+                          {formatDateHeading(dateKey)}
+                        </h3>
+                        <div className="flex-1 h-px bg-rose-100" />
+                        <span className="text-xs text-gray-400 whitespace-nowrap">{items.length} {items.length === 1 ? 'call' : 'calls'}</span>
+                      </div>
+
+                      {/* Cards for this date */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {items.map((session, idx) => {
+                          const style = getUrgencyStyle(session.triageResult?.urgency ?? 'Non-urgent');
+                          return (
+                            <button
+                              key={session.id}
+                              onClick={() => navigate(`/report/${session.id}`)}
+                              className={`fade-in-up delay-${Math.min(idx + 1, 6)} text-left bg-white border border-rose-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-rose-300 transition-all group`}
+                            >
+                              <div className="flex items-start justify-between gap-3 mb-3">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {session.triageResult ? (
+                                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold text-white ${style.bgClass}`}>
+                                      {session.triageResult.urgency}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-gray-100 text-gray-500">
+                                      Transcript only
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-gray-400">{formatTime(session.timestamp)}</span>
+                                  {session.duration && (
+                                    <span className="text-xs text-gray-300">{formatDuration(session.duration)}</span>
+                                  )}
+                                </div>
+                                <span className="text-gray-300 group-hover:text-rose-400 transition-colors text-sm flex-shrink-0">→</span>
+                              </div>
+                              <p className="font-semibold text-gray-800 text-sm mb-1">
+                                {session.triageResult?.action ?? 'Consultation recorded'}
+                              </p>
+                              <p className="text-xs text-gray-400 line-clamp-2 mb-3">
+                                {session.triageResult?.summary ?? `${session.transcript?.length ?? 0} messages — no triage result generated`}
+                              </p>
+                              {session.triageResult?.symptoms && session.triageResult.symptoms.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {session.triageResult.symptoms.slice(0, 3).map((s, i) => (
+                                    <span key={i} className="text-xs bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-full">
+                                      {s}
+                                    </span>
+                                  ))}
+                                  {session.triageResult.symptoms.length > 3 && (
+                                    <span className="text-xs text-gray-400">+{session.triageResult.symptoms.length - 3} more</span>
+                                  )}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

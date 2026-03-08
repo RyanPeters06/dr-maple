@@ -80,7 +80,10 @@ export const saveSession = async (
     const docRef = await addDoc(collection(firestore, 'sessions'), {
       userId,
       timestamp: Timestamp.now(),
-      ...data,
+      transcript: data.transcript,
+      // Firestore rejects `undefined` — only include optional fields when they have a value
+      ...(data.triageResult != null && { triageResult: data.triageResult }),
+      ...(data.duration != null && { duration: data.duration }),
     });
     return docRef.id;
   } catch (err) {
