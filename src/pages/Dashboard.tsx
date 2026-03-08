@@ -9,10 +9,13 @@ import { useState, useRef, useEffect } from 'react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAppleWatchMetrics } from '../hooks/useAppleWatchMetrics';
 import { useUserProfile } from '../hooks/useUserProfile';
-import { createPairingCode, clearAppleWatchMetrics, getSymptomLog, saveSymptomLog, saveSession, type SymptomEntry as FirebaseSymptomEntry } from '../services/firebase';
+import { createPairingCode, clearAppleWatchMetrics, getSymptomLog, saveSymptomLog, saveSession, type SymptomEntry as FirebaseSymptomEntry, type ChildProfile, type VaccineEntry, type GrowthEntry, type MedicationEntry } from '../services/firebase';
 import type { TriageResult } from '../constants';
+import { FamilyHealthSection } from '../components/FamilyHealthSection';
+import { useChildProfiles } from '../hooks/useChildProfiles';
 
-type DashSection = 'home' | 'history' | 'map' | 'watch' | 'specialists' | 'screening';
+type DashSection = 'home' | 'history' | 'map' | 'watch' | 'specialists' | 'screening' | 'family';
+type FamilySubSection = 'profiles' | 'vaccines' | 'growth' | 'medication';
 type WatchBlockDetail = 'sleep' | 'heartRate' | 'exercise' | 'steps' | null;
 
 type SymptomEntry = FirebaseSymptomEntry;
@@ -71,6 +74,16 @@ export const Dashboard = () => {
   const [symptomNote, setSymptomNote] = useState('');
   const [specialistProvince, setSpecialistProvince] = useState<string>('ON');
   const [specialistSearch, setSpecialistSearch] = useState('');
+
+  // Family Health
+  const [familySubSection, setFamilySubSection] = useState<FamilySubSection>('profiles');
+  const [childFormOpen, setChildFormOpen] = useState(false);
+  const [childFormEditing, setChildFormEditing] = useState<ChildProfile | null>(null);
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const {
+    children, loading: childrenLoading, saving: childrenSaving, error: childrenError,
+    addOrUpdateChild, deleteChild, updateChildVaccines, updateChildGrowth, updateChildMedications,
+  } = useChildProfiles(user?.sub);
 
   // Load from Firebase on mount, fall back to localStorage
   useEffect(() => {
@@ -230,6 +243,7 @@ export const Dashboard = () => {
     { id: 'watch',       label: 'My Wellness',       action: () => setActiveSection('watch') },
     { id: 'map',         label: 'Find a Clinic',     action: () => setActiveSection('map') },
     { id: 'specialists', label: 'Find a Specialist', action: () => setActiveSection('specialists') },
+    { id: 'family',      label: 'Family Health',     action: () => setActiveSection('family') },
     // Quick Screening left in the back for now — section still exists, not in nav
     // { id: 'screening',   icon: '❤️', label: 'Quick Screening',  action: () => setActiveSection('screening') },
   ];
@@ -379,6 +393,19 @@ export const Dashboard = () => {
                     Official provincial directories to find and contact doctors.
                   </p>
                   <span className="inline-block mt-3 text-rose-600 font-medium text-sm group-hover:underline">Search →</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('family')}
+                  className="group text-left rounded-2xl border border-rose-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-rose-200 transition-all"
+                >
+                  <span className="text-3xl block mb-3">👨‍👩‍👧‍👦</span>
+                  <h3 className="font-bold text-gray-900 text-lg mb-1">Family Health</h3>
+                  <p className="text-sm text-gray-600">
+                    Manage your children's health records, vaccinations, and medications.
+                  </p>
+                  <span className="inline-block mt-3 text-rose-600 font-medium text-sm group-hover:underline">Open →</span>
                 </button>
                 {/* Quick Screening left in the back for now — no card on home */}
               </div>
@@ -1233,6 +1260,30 @@ export const Dashboard = () => {
                 </div>
               )}
             </div>
+          )}
+
+          {/* ── Family Health ──────────────────────────────────────────────── */}
+          {activeSection === 'family' && (
+            <FamilyHealthSection
+              familySubSection={familySubSection}
+              setFamilySubSection={setFamilySubSection}
+              children={children}
+              childrenLoading={childrenLoading}
+              childrenSaving={childrenSaving}
+              childrenError={childrenError}
+              selectedChildId={selectedChildId}
+              setSelectedChildId={setSelectedChildId}
+              childFormOpen={childFormOpen}
+              childFormEditing={childFormEditing}
+              setChildFormOpen={setChildFormOpen}
+              setChildFormEditing={setChildFormEditing}
+              addOrUpdateChild={addOrUpdateChild}
+              deleteChild={deleteChild}
+              updateChildVaccines={updateChildVaccines}
+              updateChildGrowth={updateChildGrowth}
+              updateChildMedications={updateChildMedications}
+              ageFromDateOfBirth={ageFromDateOfBirth}
+            />
           )}
 
           {/* ── Find a Clinic ──────────────────────────────────────────────── */}

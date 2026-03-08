@@ -304,6 +304,119 @@ export const saveUserProfile = async (userId: string, profile: UserProfile): Pro
   return true;
 };
 
+// ─── Family Health: child profiles (subcollection users/{userId}/children) ───
+
+export interface VaccineEntry {
+  id: string;
+  name: string;
+  date: string;
+  expirationDate?: string | null;
+  notes?: string;
+}
+
+export interface GrowthEntry {
+  id: string;
+  date: string;
+  heightCm?: number;
+  weightKg?: number;
+}
+
+export interface MedicationEntry {
+  id: string;
+  name: string;
+  dosage?: string;
+  schedule?: string;
+  notes?: string;
+}
+
+export interface ChildProfile {
+  id: string;
+  name: string;
+  dateOfBirth: string;
+  sex?: string;
+  vaccines?: VaccineEntry[];
+  growth?: GrowthEntry[];
+  medications?: MedicationEntry[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const getChildProfiles = async (userId: string): Promise<ChildProfile[]> => {
+  const firestore = getDb();
+  if (!firestore) return [];
+  try {
+    const ref = collection(firestore, 'users', userId, 'children');
+    const snapshot = await getDocs(ref);
+    return snapshot.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        name: data.name ?? '',
+        dateOfBirth: data.dateOfBirth ?? '',
+        sex: data.sex ?? undefined,
+        vaccines: Array.isArray(data.vaccines) ? data.vaccines : [],
+        growth: Array.isArray(data.growth) ? data.growth : [],
+        medications: Array.isArray(data.medications) ? data.medications : [],
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+      };
+    });
+  } catch (err) {
+    console.error('Failed to load child profiles:', err);
+    return [];
+  }
+};
+
+const stripUndefined = <T>(value: T): T => {
+  if (value === undefined) return value;
+  if (Array.isArray(value)) return value.map(stripUndefined) as T;
+  if (value != null && typeof value === 'object' && !(value instanceof Timestamp)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v !== undefined) out[k] = stripUndefined(v);
+    }
+    return out as T;
+  }
+  return value;
+};
+
+export const saveChildProfile = async (
+  userId: string,
+  data: Omit<ChildProfile, 'id' | 'createdAt' | 'updatedAt'> | (ChildProfile & { id: string })
+): Promise<string | null> => {
+  const firestore = getDb();
+  if (!firestore) return null;
+  const now = Timestamp.now();
+  const payload = {
+    name: data.name,
+    dateOfBirth: data.dateOfBirth,
+    sex: data.sex ?? null,
+    vaccines: stripUndefined(data.vaccines ?? []),
+    growth: stripUndefined(data.growth ?? []),
+    medications: stripUndefined(data.medications ?? []),
+    updatedAt: now,
+    ...('id' in data && data.id ? {} : { createdAt: now }),
+  };
+  try {
+    if ('id' in data && data.id) {
+      const ref = doc(firestore, 'users', userId, 'children', data.id);
+      await setDoc(ref, payload, { merge: true });
+      return data.id;
+    }
+    const ref = await addDoc(collection(firestore, 'users', userId, 'children'), payload);
+    return ref.id;
+  } catch (err) {
+    console.error('Failed to save child profile:', err);
+    throw err;
+  }
+};
+
+export const deleteChildProfile = async (userId: string, childId: string): Promise<void> => {
+  const firestore = getDb();
+  if (!firestore) return;
+  await deleteDoc(doc(firestore, 'users', userId, 'children', childId));
+};
+
 // ─── Symptom log (personal symptom diary, persisted per user) ────────────────
 
 export interface SymptomEntry {
